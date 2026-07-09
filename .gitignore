@@ -1,0 +1,48 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Dependency directories
+node_modules/
+**/node_modules/
+
+# Compiler and Build outputs
+dist/
+**/dist/
+build/
+**/build/
+temp/
+tmp/
+out/
+.tscache/
+*.tsbuildinfo
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+*.suo
+*.user
+*.userossc
+*.sln.docstates
+
+# Environment variables (Crucial for API keys security)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
