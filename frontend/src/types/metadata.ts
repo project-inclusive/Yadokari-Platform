@@ -145,4 +145,6 @@ export interface ProjectState {
   chatHistory: ChatMessage[];
   backendMetadata: BackendMetadata | null;
   frontendMetadata: FrontendMetadata | null;
+  jsonParseError?: string | null;
+  rawJsonString?: string | null;
 }

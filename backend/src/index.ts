@@ -10,7 +10,7 @@ import { getChatRoute } from './routes/chat.js'
 // 環境変数の読み込み (.envはプロジェクトルートにあるので、そこから探す)
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') }) // frontend, backend と同階層のルートにある .env
+dotenv.config({ path: path.resolve(__dirname, '../../.env') }) // frontend, backend と同階層のルートにある .env
 
 const app = new Hono()
 

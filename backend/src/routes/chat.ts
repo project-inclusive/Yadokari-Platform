@@ -12,14 +12,14 @@ export function getChatRoute() {
 
     try {
       const body = await c.req.json()
-      const { messages, model } = body
+      const { messages, model, response_format } = body
 
       if (!messages || !Array.isArray(messages)) {
         return c.json({ error: 'Messages array is required' }, 400)
       }
 
-      const selectedModel = model || 'google/gemini-flash-1.5'
-      console.log(`LLM Request to ${selectedModel}`)
+      const selectedModel = model || 'openai/gpt-oss-120b'
+      console.log(`LLM Request to ${selectedModel}. Structured Outputs (response_format) payload present: ${!!response_format}`)
 
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -32,7 +32,8 @@ export function getChatRoute() {
         body: JSON.stringify({
           model: selectedModel,
           messages: messages,
-          stream: true
+          stream: true,
+          response_format: response_format
         })
       })
 

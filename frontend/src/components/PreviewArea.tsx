@@ -6,15 +6,19 @@ import { AppSimulator } from './AppSimulator';
 interface PreviewAreaProps {
   backendMetadata: BackendMetadata | null;
   frontendMetadata: FrontendMetadata | null;
+  jsonParseError?: string | null;
+  rawJsonString?: string | null;
 }
 
 export const PreviewArea: React.FC<PreviewAreaProps> = ({
   backendMetadata,
-  frontendMetadata
+  frontendMetadata,
+  jsonParseError,
+  rawJsonString
 }) => {
   const [activeTab, setActiveTab] = useState<'flow' | 'preview' | 'json'>('flow');
 
-  const hasData = backendMetadata || frontendMetadata;
+  const hasData = backendMetadata || frontendMetadata || !!rawJsonString;
 
   return (
     <div className="flex flex-col h-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
@@ -65,12 +69,25 @@ export const PreviewArea: React.FC<PreviewAreaProps> = ({
         </div>
 
         <div className="flex items-center space-x-1">
-          <div className={`w-2 h-2 rounded-full ${hasData ? 'bg-emerald-500 animate-pulse' : 'bg-slate-700'}`}></div>
+          <div className={`w-2 h-2 rounded-full ${
+            jsonParseError ? 'bg-red-500' : hasData ? 'bg-emerald-500 animate-pulse' : 'bg-slate-700'
+          }`}></div>
           <span className="text-[10px] text-slate-500 font-mono tracking-wider">
-            {hasData ? 'SYNCED' : 'STANDBY'}
+            {jsonParseError ? 'PARSE_ERROR' : hasData ? 'SYNCED' : 'STANDBY'}
           </span>
         </div>
       </div>
+
+      {/* エラーアラート領域 */}
+      {jsonParseError && (
+        <div className="mx-5 mt-4 p-3 bg-red-950/40 border border-red-900/60 rounded-xl text-xs text-red-300 flex flex-col space-y-1 animate-fade-in shrink-0">
+          <div className="font-bold flex items-center">
+            <span className="mr-1.5">⚠️</span> AIが生成した定義データにエラーがあります
+          </div>
+          <p className="font-mono text-[10px] bg-red-950/80 p-2 rounded-md border border-red-900/40 mt-1">{jsonParseError}</p>
+          <p className="text-[10px] text-red-400 mt-1">※チャットで「JSONの文法エラーを修正して」と指示するか、右側の「定義データ (JSON)」タブで生データを確認してください。</p>
+        </div>
+      )}
 
       {/* コンテンツ領域 */}
       <div className="flex-1 p-5 overflow-y-auto bg-slate-900/30">
@@ -97,27 +114,43 @@ export const PreviewArea: React.FC<PreviewAreaProps> = ({
 
             {activeTab === 'json' && (
               <div className="space-y-6 h-full flex flex-col">
-                {/* バックエンドメタデータ表示 */}
-                <div className="flex-1 flex flex-col min-h-[200px]">
-                  <h4 className="text-xs font-semibold text-slate-400 mb-2 flex items-center">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-2"></span>
-                    バックエンド設計メタデータ (OpenFisca)
-                  </h4>
-                  <pre className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-[10px] font-mono text-indigo-300 overflow-auto select-all max-h-[250px]">
-                    {backendMetadata ? JSON.stringify(backendMetadata, null, 2) : '// データなし'}
-                  </pre>
-                </div>
+                {jsonParseError && rawJsonString && (
+                  <div className="flex-1 flex flex-col min-h-[200px]">
+                    <h4 className="text-xs font-semibold text-red-400 mb-2 flex items-center">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-2"></span>
+                      構文エラーが発生した生のJSONデータ
+                    </h4>
+                    <pre className="flex-1 bg-red-950/15 border border-red-900/40 rounded-xl p-3 text-[10px] font-mono text-red-200 overflow-auto select-all max-h-[450px]">
+                      {rawJsonString}
+                    </pre>
+                  </div>
+                )}
 
-                {/* フロントエンドメタデータ表示 */}
-                <div className="flex-1 flex flex-col min-h-[200px]">
-                  <h4 className="text-xs font-semibold text-slate-400 mb-2 flex items-center">
-                    <span className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-2"></span>
-                    フロントエンド質問マニフェスト (GUI)
-                  </h4>
-                  <pre className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-[10px] font-mono text-purple-300 overflow-auto select-all max-h-[250px]">
-                    {frontendMetadata ? JSON.stringify(frontendMetadata, null, 2) : '// データなし'}
-                  </pre>
-                </div>
+                {!jsonParseError && (
+                  <>
+                    {/* バックエンドメタデータ表示 */}
+                    <div className="flex-1 flex flex-col min-h-[200px]">
+                      <h4 className="text-xs font-semibold text-slate-400 mb-2 flex items-center">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-2"></span>
+                        バックエンド設計メタデータ (OpenFisca)
+                      </h4>
+                      <pre className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-[10px] font-mono text-indigo-300 overflow-auto select-all max-h-[200px]">
+                        {backendMetadata ? JSON.stringify(backendMetadata, null, 2) : '// データなし'}
+                      </pre>
+                    </div>
+
+                    {/* フロントエンドメタデータ表示 */}
+                    <div className="flex-1 flex flex-col min-h-[200px]">
+                      <h4 className="text-xs font-semibold text-slate-400 mb-2 flex items-center">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-2"></span>
+                        フロントエンド質問マニフェスト (GUI)
+                      </h4>
+                      <pre className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-[10px] font-mono text-purple-300 overflow-auto select-all max-h-[200px]">
+                        {frontendMetadata ? JSON.stringify(frontendMetadata, null, 2) : '// データなし'}
+                      </pre>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

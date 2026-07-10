@@ -5,7 +5,7 @@ interface ChatConsoleProps {
   chatHistory: ChatMessage[];
   projectName: string;
   onProjectNameChange: (name: string) => void;
-  onSendMessage: (message: string) => Promise<void>;
+  onSendMessage: (message: string, model: string) => Promise<void>;
   onClearHistory: () => void;
   isGenerating: boolean;
   onScrapeUrl: (url: string) => Promise<string>;
@@ -24,7 +24,7 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
   const [urlInput, setUrlInput] = useState('');
   const [isScraping, setIsScraping] = useState(false);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState('google/gemini-flash-1.5');
+  const [selectedModel, setSelectedModel] = useState('openai/gpt-oss-120b');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isGenerating) return;
-    onSendMessage(input.trim());
+    onSendMessage(input.trim(), selectedModel);
     setInput('');
   };
 
@@ -79,7 +79,9 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
             onChange={(e) => setSelectedModel(e.target.value)}
             className="bg-slate-800 text-slate-300 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
-            <option value="google/gemini-flash-1.5">Gemini 1.5 Flash (高速)</option>
+            <option value="openai/gpt-oss-120b">GPT OSS 120B (高性能)</option>
+            <option value="google/gemma-4-31b-it:free">Gemma 4 31B IT (無料)</option>
+            <option value="google/gemini-1.5-flash">Gemini 1.5 Flash (高速)</option>
             <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (高精度)</option>
             <option value="meta-llama/llama-3.1-70b-instruct">Llama 3.1 70B</option>
           </select>
