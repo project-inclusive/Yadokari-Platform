@@ -102,13 +102,20 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
 
   const handleScrape = async () => {
     if (!urlInput.trim() || isScraping) return;
+    
+    const url = urlInput.trim();
+    if (url.toLowerCase().endsWith('.pdf')) {
+      setScrapeError('PDFファイルからのテキスト自動読み込みには現在対応していません。お手数ですが、PDFのテキスト内容をコピーして、メッセージ欄に直接貼り付けて送信してください。');
+      return;
+    }
+
     setIsScraping(true);
     setScrapeError(null);
     try {
-      const extractedText = await onScrapeUrl(urlInput.trim());
+      const extractedText = await onScrapeUrl(url);
       
       const userMessageText = `以下の制度情報に基づいて、計算ロジックを生成・修正してください。\n\n【制度情報（抽出済）】\n${extractedText}`;
-      const displayMessageText = `制度説明HP (URL: ${urlInput.trim()}) から情報を読み込みました。`;
+      const displayMessageText = `制度説明HP (URL: ${url}) から情報を読み込みました。`;
       
       await onSendMessage(userMessageText, selectedModel, 'logic', displayMessageText);
       setUrlInput('');
@@ -141,10 +148,10 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
             onChange={(e) => setSelectedModel(e.target.value)}
             className="bg-slate-800 text-slate-300 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
-            <option value="deepseek/deepseek-v4-pro">DeepSeek V4 Pro (推奨)</option>
+            <option value="openai/gpt-5.4-mini">GPT 5.4 Mini (推奨)</option>
+            <option value="deepseek/deepseek-v4-pro">DeepSeek V4 Pro</option>
             <option value="google/gemini-3.5-flash">Gemini 3.5 Flash</option>
             <option value="z-ai/glm-5.2">GLM 5.2</option>
-            <option value="openai/gpt-5.4-mini">GPT 5.4 Mini</option>
             <option value="openai/gpt-oss-120b">GPT OSS 120B (高品質)</option>
             <option value="google/gemma-4-31b-it:free">Gemma 4 31B IT (無料)</option>
             <option value="google/gemini-1.5-flash">Gemini 1.5 Flash (高速)</option>
@@ -192,7 +199,7 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
             <div className="flex space-x-2">
               <button
                 type="button"
-                disabled={!hasLogicData || currentPhase !== 'logic' || isGenerating}
+                disabled={!hasLogicData || isGenerating}
                 onClick={onModifyLogic}
                 className="flex-1 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] font-semibold text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
               >

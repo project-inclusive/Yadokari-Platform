@@ -19,6 +19,7 @@ import type { BackendMetadata, Parameter, FormulaDependencyParameter } from '../
 
 interface LogicFlowProps {
   metadata: BackendMetadata | null;
+  resolvedTheme: 'light' | 'dark';
 }
 
 // 接続用ハンドルを備えたカスタムロジックノード
@@ -32,11 +33,11 @@ const LogicNode = ({ data, style, id }: any) => {
         position={Position.Top}
         style={{
           top: '-4px',
-          background: '#818cf8',
+          background: 'var(--color-indigo-400)',
           borderRadius: '50%',
           width: '8px',
           height: '8px',
-          border: '1px solid #0f172a',
+          border: '1px solid var(--color-slate-900)',
           zIndex: 10
         }}
       />
@@ -52,11 +53,11 @@ const LogicNode = ({ data, style, id }: any) => {
           position={Position.Bottom}
           style={{
             bottom: '-4px',
-            background: '#818cf8',
+            background: 'var(--color-indigo-400)',
             borderRadius: '50%',
             width: '8px',
             height: '8px',
-            border: '1px solid #0f172a',
+            border: '1px solid var(--color-slate-900)',
             zIndex: 10
           }}
         />
@@ -105,11 +106,11 @@ const getNodeStyle = (type: string, isStart: boolean) => {
     padding: '16px',
     borderRadius: '12px',
     fontSize: '11px',
-    color: '#e2e8f0',
+    color: 'var(--color-slate-100)',
     width: 220,
-    border: '2px solid #334155',
-    background: '#0f172a',
-    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3)',
+    border: '2px solid var(--color-slate-700)',
+    background: 'var(--color-slate-900)',
+    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.15), 0 4px 6px -4px rgba(0, 0, 0, 0.15)',
     textAlign: 'center',
     fontWeight: 500,
     lineHeight: 1.5,
@@ -118,26 +119,26 @@ const getNodeStyle = (type: string, isStart: boolean) => {
   };
 
   if (isStart) {
-    baseStyle.borderColor = '#818cf8';
+    baseStyle.borderColor = 'var(--color-indigo-400)';
     baseStyle.boxShadow = '0 0 15px rgba(99, 102, 241, 0.35)';
   }
 
   if (type === 'conditional') {
-    baseStyle.borderColor = '#4f46e5';
-    baseStyle.background = '#1e1b4b';
+    baseStyle.borderColor = 'var(--color-indigo-400)';
+    baseStyle.background = 'var(--color-indigo-950)';
   } else if (type === 'assignment') {
-    baseStyle.borderColor = '#475569';
-    baseStyle.background = '#0f172a';
+    baseStyle.borderColor = 'var(--color-slate-600)';
+    baseStyle.background = 'var(--color-slate-900)';
   } else if (type === 'return') {
-    baseStyle.borderColor = '#059669';
-    baseStyle.background = '#064e3b';
+    baseStyle.borderColor = 'var(--color-emerald-400)';
+    baseStyle.background = 'var(--color-emerald-950)';
     baseStyle.fontWeight = 700;
   }
 
   return baseStyle;
 };
 
-export const LogicFlow: React.FC<LogicFlowProps> = ({ metadata }) => {
+export const LogicFlow: React.FC<LogicFlowProps> = ({ metadata, resolvedTheme }) => {
   const [nodes, setNodes] = useState<FlowNode[]>([]);
   const [edges, setEdges] = useState<FlowEdge[]>([]);
   const [selectedVariableIndex, setSelectedVariableIndex] = useState<number>(0);
@@ -269,6 +270,11 @@ export const LogicFlow: React.FC<LogicFlowProps> = ({ metadata }) => {
         position: { x: 0, y: 0 },
       });
 
+      const isDarkMode = resolvedTheme === 'dark';
+      const yesColor = isDarkMode ? '#34d399' : '#059669';
+      const noColor = isDarkMode ? '#f87171' : '#dc2626';
+      const normalColor = isDarkMode ? '#64748b' : '#94a3b8';
+
       if (node.type === 'conditional') {
         if (node.true_node) {
           rawEdges.push({
@@ -276,9 +282,9 @@ export const LogicFlow: React.FC<LogicFlowProps> = ({ metadata }) => {
             source: node.id,
             target: node.true_node,
             label: 'はい',
-            labelStyle: { fill: '#34d399', fontSize: 10, fontWeight: 700 },
-            style: { stroke: '#34d399', strokeWidth: 2 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#34d399', width: 20, height: 20 },
+            labelStyle: { fill: yesColor, fontSize: 10, fontWeight: 700 },
+            style: { stroke: yesColor, strokeWidth: 2 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: yesColor, width: 20, height: 20 },
           });
         }
         if (node.false_node) {
@@ -287,9 +293,9 @@ export const LogicFlow: React.FC<LogicFlowProps> = ({ metadata }) => {
             source: node.id,
             target: node.false_node,
             label: 'いいえ',
-            labelStyle: { fill: '#f87171', fontSize: 10, fontWeight: 700 },
-            style: { stroke: '#f87171', strokeWidth: 2 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#f87171', width: 20, height: 20 },
+            labelStyle: { fill: noColor, fontSize: 10, fontWeight: 700 },
+            style: { stroke: noColor, strokeWidth: 2 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: noColor, width: 20, height: 20 },
           });
         }
       } else if (node.type === 'assignment' && node.next_node) {
@@ -297,8 +303,8 @@ export const LogicFlow: React.FC<LogicFlowProps> = ({ metadata }) => {
           id: `${node.id}-${node.next_node}`,
           source: node.id,
           target: node.next_node,
-          style: { stroke: '#64748b', strokeWidth: 2 },
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b', width: 20, height: 20 },
+          style: { stroke: normalColor, strokeWidth: 2 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: normalColor, width: 20, height: 20 },
         });
       }
     });
@@ -306,7 +312,7 @@ export const LogicFlow: React.FC<LogicFlowProps> = ({ metadata }) => {
     const layoutedNodes = getLayoutedElements(rawNodes, rawEdges);
     setNodes(layoutedNodes);
     setEdges(rawEdges);
-  }, [metadata, selectedVariableIndex]);
+  }, [metadata, selectedVariableIndex, resolvedTheme]);
 
   if (!metadata || !metadata.variables || metadata.variables.length === 0) {
     return (
@@ -342,23 +348,23 @@ export const LogicFlow: React.FC<LogicFlowProps> = ({ metadata }) => {
           nodeTypes={nodeTypes}
           fitView
           fitViewOptions={{ padding: 0.3 }}
-          colorMode="dark"
+          colorMode={resolvedTheme}
         >
           <Controls className="bg-slate-900 border border-slate-800 text-slate-300 rounded-lg" />
            <MiniMap
             className="bg-slate-900 border border-slate-700/50 rounded-xl"
             style={{
-              background: '#1e293b',
+              background: 'var(--color-slate-800)',
             }}
             nodeColor={(node) => {
               if (node.style?.borderColor) return node.style.borderColor as string;
-              return '#6366f1';
+              return 'var(--color-indigo-400)';
             }}
-            nodeStrokeColor="#ffffff"
+            nodeStrokeColor={resolvedTheme === 'dark' ? '#ffffff' : '#000000'}
             nodeStrokeWidth={4}
-            maskColor="rgba(15, 23, 42, 0.75)"
+            maskColor={resolvedTheme === 'dark' ? 'rgba(15, 23, 42, 0.75)' : 'rgba(255, 255, 255, 0.75)'}
           />
-          <Background variant={BackgroundVariant.Dots} gap={12} size={1} color="#334155" />
+          <Background variant={BackgroundVariant.Dots} gap={12} size={1} color="var(--bg-grid-dots)" />
         </ReactFlow>
       </div>
     </div>

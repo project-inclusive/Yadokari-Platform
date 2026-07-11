@@ -25,6 +25,7 @@ import type { FrontendMetadata } from '../types/metadata';
 interface AppSimulatorProps {
   metadata: FrontendMetadata | null;
   onMetadataChange?: (newMetadata: FrontendMetadata) => void;
+  resolvedTheme: 'light' | 'dark';
 }
 
 // 接続用ハンドルを備えたカスタム質問ノード
@@ -39,11 +40,11 @@ const QuestionNode = ({ data, style, id }: any) => {
         position={Position.Top}
         style={{
           top: '-4px',
-          background: '#a78bfa',
+          background: 'var(--color-purple-400)',
           borderRadius: '50%',
           width: '8px',
           height: '8px',
-          border: '1px solid #0f172a',
+          border: '1px solid var(--color-slate-900)',
           zIndex: 10
         }}
       />
@@ -60,11 +61,11 @@ const QuestionNode = ({ data, style, id }: any) => {
           position={Position.Bottom}
           style={{
             bottom: '-4px',
-            background: '#a78bfa',
+            background: 'var(--color-purple-400)',
             borderRadius: '50%',
             width: '8px',
             height: '8px',
-            border: '1px solid #0f172a',
+            border: '1px solid var(--color-slate-900)',
             zIndex: 10
           }}
         />
@@ -113,11 +114,11 @@ const getQuestionNodeStyle = (type: string, isStart: boolean) => {
     padding: '16px',
     borderRadius: '12px',
     fontSize: '11px',
-    color: '#e2e8f0',
+    color: 'var(--color-slate-100)',
     width: 220,
-    border: '2px solid #475569',
-    background: '#0f172a',
-    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3)',
+    border: '2px solid var(--color-slate-750)',
+    background: 'var(--color-slate-900)',
+    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.15), 0 4px 6px -4px rgba(0, 0, 0, 0.15)',
     textAlign: 'center',
     fontWeight: 500,
     lineHeight: 1.5,
@@ -125,26 +126,26 @@ const getQuestionNodeStyle = (type: string, isStart: boolean) => {
   };
 
   if (isStart) {
-    baseStyle.borderColor = '#c084fc';
+    baseStyle.borderColor = 'var(--color-purple-400)';
     baseStyle.boxShadow = '0 0 15px rgba(168, 85, 247, 0.35)';
   }
 
   if (type === 'Selection' || type === 'MultipleSelection') {
-    baseStyle.borderColor = '#8b5cf6';
-    baseStyle.background = '#2e1065';
+    baseStyle.borderColor = 'var(--color-purple-400)';
+    baseStyle.background = 'var(--color-purple-950)';
   } else if (type === 'Age' || type === 'PersonNum') {
-    baseStyle.borderColor = '#0ea5e9';
-    baseStyle.background = '#0c4a6e';
+    baseStyle.borderColor = 'var(--color-sky-500)';
+    baseStyle.background = 'var(--color-sky-950)';
   } else if (type === 'completed') {
-    baseStyle.borderColor = '#10b981';
-    baseStyle.background = '#064e3b';
+    baseStyle.borderColor = 'var(--color-emerald-400)';
+    baseStyle.background = 'var(--color-emerald-950)';
     baseStyle.fontWeight = 700;
   }
 
   return baseStyle;
 };
 
-export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadataChange }) => {
+export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadataChange, resolvedTheme }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
 
@@ -188,6 +189,11 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
       position: { x: 0, y: 0 },
     });
 
+    const isDarkMode = resolvedTheme === 'dark';
+    const edgeColorNext = isDarkMode ? '#a78bfa' : '#7c3aed';
+    const edgeColorCond = isDarkMode ? '#38bdf8' : '#0284c7';
+    const edgeColorEnd = isDarkMode ? '#10b981' : '#059669';
+
     // 2. 状態遷移 (Flow) からエッジを構築
     metadata.flow.states.forEach((state) => {
       // 固定の次遷移
@@ -197,8 +203,8 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
           source: state.id,
           target: state.nextQuestionKey,
           reconnectable: true,
-          style: { stroke: '#a78bfa', strokeWidth: 2 },
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#a78bfa', width: 20, height: 20 },
+          style: { stroke: edgeColorNext, strokeWidth: 2 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: edgeColorNext, width: 20, height: 20 },
         });
       }
 
@@ -227,9 +233,9 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
             target: targetId,
             label: label,
             reconnectable: true,
-            labelStyle: { fill: '#38bdf8', fontSize: 9, fontWeight: 600 },
-            style: { stroke: '#38bdf8', strokeWidth: 1.5, strokeDasharray: '4 4' },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#38bdf8', width: 15, height: 15 },
+            labelStyle: { fill: edgeColorCond, fontSize: 9, fontWeight: 600 },
+            style: { stroke: edgeColorCond, strokeWidth: 1.5, strokeDasharray: '4 4' },
+            markerEnd: { type: MarkerType.ArrowClosed, color: edgeColorCond, width: 15, height: 15 },
           });
         });
       }
@@ -242,8 +248,8 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
           source: state.id,
           target: 'COMPLETED_STATE',
           reconnectable: true,
-          style: { stroke: '#10b981', strokeWidth: 2 },
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#10b981', width: 20, height: 20 },
+          style: { stroke: edgeColorEnd, strokeWidth: 2 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: edgeColorEnd, width: 20, height: 20 },
         });
       }
     });
@@ -251,7 +257,7 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
     const layoutedNodes = getLayoutedElements(rawNodes, rawEdges);
     setNodes(layoutedNodes);
     setEdges(rawEdges);
-  }, [metadata, setNodes, setEdges]);
+  }, [metadata, setNodes, setEdges, resolvedTheme]);
 
   // エッジの繋ぎ替えを検出した際に、親のメタデータに書き戻すロジック
   const updateMetadataTransition = useCallback((sourceId: string, oldTargetId: string, newTargetId: string) => {
@@ -351,23 +357,23 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
           nodeTypes={nodeTypes}
           fitView
           fitViewOptions={{ padding: 0.3 }}
-          colorMode="dark"
+          colorMode={resolvedTheme}
         >
           <Controls className="bg-slate-900 border border-slate-800 text-slate-300 rounded-lg" />
           <MiniMap
             className="bg-slate-900 border border-slate-700/50 rounded-xl"
             style={{
-              background: '#1e293b',
+              background: 'var(--color-slate-800)',
             }}
             nodeColor={(node) => {
               if (node.style?.borderColor) return node.style.borderColor as string;
-              return '#a78bfa';
+              return 'var(--color-purple-400)';
             }}
-            nodeStrokeColor="#ffffff"
+            nodeStrokeColor={resolvedTheme === 'dark' ? '#ffffff' : '#000000'}
             nodeStrokeWidth={4}
-            maskColor="rgba(15, 23, 42, 0.75)"
+            maskColor={resolvedTheme === 'dark' ? 'rgba(15, 23, 42, 0.75)' : 'rgba(255, 255, 255, 0.75)'}
           />
-          <Background variant={BackgroundVariant.Dots} gap={12} size={1} color="#334155" />
+          <Background variant={BackgroundVariant.Dots} gap={12} size={1} color="var(--bg-grid-dots)" />
         </ReactFlow>
       </div>
     </div>

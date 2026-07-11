@@ -1,79 +1,5 @@
 import * as cheerio from 'cheerio';
 
-// Shim to resolve Object.defineProperty errors on global prototypes in some environments
-if (typeof globalThis.ReadableStream === 'function') {
-  try {
-    const OriginalReadableStream: any = globalThis.ReadableStream;
-    
-    const PolyfilledReadableStream = function(this: any, ...args: any[]) {
-      return Reflect.construct(OriginalReadableStream, args, new.target || PolyfilledReadableStream);
-    };
-    
-    // Copy prototype chain
-    PolyfilledReadableStream.prototype = Object.create(OriginalReadableStream.prototype);
-    PolyfilledReadableStream.prototype.constructor = PolyfilledReadableStream;
-    
-    // Copy static properties
-    for (const key of Reflect.ownKeys(OriginalReadableStream)) {
-      if (key !== 'prototype' && key !== 'name' && key !== 'length') {
-        try {
-          Object.defineProperty(PolyfilledReadableStream, key, 
-            Object.getOwnPropertyDescriptor(OriginalReadableStream, key) || {}
-          );
-        } catch (e) {}
-      }
-    }
-    
-    try {
-      Object.defineProperty(globalThis, 'ReadableStream', {
-        value: PolyfilledReadableStream,
-        writable: true,
-        configurable: true
-      });
-    } catch (e) {
-      (globalThis as any).ReadableStream = PolyfilledReadableStream;
-    }
-  } catch (e) {}
-}
-
-if (typeof globalThis.navigator === 'object' && globalThis.navigator !== null) {
-  try {
-    const originalNavigator = globalThis.navigator;
-    const polyfilledNavigator = Object.create(originalNavigator);
-    
-    let platform = '';
-    let userAgent = '';
-    try { platform = originalNavigator.platform || ''; } catch (e) {}
-    try { userAgent = originalNavigator.userAgent || ''; } catch (e) {}
-    
-    Object.defineProperty(polyfilledNavigator, 'platform', {
-      get() { return platform; },
-      set(val) { platform = val; },
-      configurable: true,
-      enumerable: true
-    });
-    
-    Object.defineProperty(polyfilledNavigator, 'userAgent', {
-      get() { return userAgent; },
-      set(val) { userAgent = val; },
-      configurable: true,
-      enumerable: true
-    });
-    
-    try {
-      globalThis.navigator = polyfilledNavigator;
-    } catch (e) {
-      try {
-        Object.defineProperty(globalThis, 'navigator', {
-          value: polyfilledNavigator,
-          writable: true,
-          configurable: true
-        });
-      } catch (e2) {}
-    }
-  } catch (e) {}
-}
-
 export const onRequestPost: PagesFunction = async (context) => {
   try {
     const { url } = await context.request.json() as { url?: string };
@@ -101,18 +27,10 @@ export const onRequestPost: PagesFunction = async (context) => {
     const isPdf = contentType.toLowerCase().includes('application/pdf') || url.toLowerCase().endsWith('.pdf');
 
     if (isPdf) {
-      const arrayBuffer = await response.arrayBuffer();
-      const { getDocumentProxy, extractText } = await import('unpdf');
-      const pdf = await getDocumentProxy(new Uint8Array(arrayBuffer));
-      const { text } = await extractText(pdf);
-      const textContent = Array.isArray(text) ? text.join('\n') : (text || '');
-
       return new Response(JSON.stringify({
-        url,
-        title: url.split('/').pop() || 'PDF Document',
-        content: textContent.trim()
+        error: 'PDFファイルからのテキスト自動読み込みには現在対応していません。お手数ですが、PDFのテキスト内容をコピーして、メッセージ欄に直接貼り付けて送信してください。'
       }), {
-        status: 200,
+        status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }

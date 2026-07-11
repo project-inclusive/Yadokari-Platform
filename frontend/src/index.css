@@ -2,16 +2,82 @@
 
 @import "tailwindcss";
 
+@theme {
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-850: #161e2e;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #0b0f19;
+
+  --color-app-bg: #070a13;
+  --color-header-bg: #0b0f19;
+  
+  --bg-grid-dots: #334155;
+}
+
 :root {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color-scheme: dark;
+  --bg-body: var(--color-app-bg);
+  --text-body: var(--color-slate-100);
 }
 
 body {
-  background-color: #0b0f19; /* slate-950 / ディープインディゴ調の暗背景 */
-  color: #f3f4f6;
+  background-color: var(--bg-body);
+  color: var(--text-body);
   margin: 0;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+/* Light Theme overrides */
+.light {
+  color-scheme: light;
+  
+  --color-slate-50: #0f172a;
+  --color-slate-100: #1e293b;
+  --color-slate-200: #334155;
+  --color-slate-300: #475569;
+  --color-slate-400: #64748b;
+  --color-slate-500: #94a3b8;
+  --color-slate-600: #cbd5e1;
+  --color-slate-700: #cbd5e1;
+  --color-slate-800: #e2e8f0;
+  --color-slate-850: #f1f5f9;
+  --color-slate-900: #f8fafc;
+  --color-slate-950: #ffffff;
+
+  --color-app-bg: #f1f5f9;
+  --color-header-bg: #ffffff;
+  
+  --bg-grid-dots: #cbd5e1;
+
+  --color-indigo-950: #e0e7ff;
+  --color-indigo-400: #4f46e5;
+  
+  --color-purple-950: #f3e8ff;
+  --color-purple-400: #7c3aed;
+
+  --color-emerald-950: #d1fae5;
+  --color-emerald-400: #10b981;
+
+  --color-sky-950: #e0f2fe;
+  --color-sky-500: #0ea5e9;
+
+  --color-red-950: #fee2e2;
+  --color-red-900: #fca5a5;
+  --color-red-300: #b91c1c;
+  --color-red-200: #991b1b;
+}
+
+/* Custom variant for Tailwind dark mode class selector if needed */
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* スクロールバーのカスタマイズ */
 ::-webkit-scrollbar {
@@ -19,12 +85,13 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: var(--color-slate-900);
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--color-slate-700);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--color-slate-600);
 }
+

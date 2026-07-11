@@ -11,6 +11,7 @@ interface PreviewAreaProps {
   activeTab: 'flow' | 'preview' | 'json';
   setActiveTab: (tab: 'flow' | 'preview' | 'json') => void;
   onFrontendMetadataChange?: (newMetadata: FrontendMetadata) => void;
+  resolvedTheme: 'light' | 'dark';
 }
 
 export const PreviewArea: React.FC<PreviewAreaProps> = ({
@@ -20,7 +21,8 @@ export const PreviewArea: React.FC<PreviewAreaProps> = ({
   rawJsonString,
   activeTab,
   setActiveTab,
-  onFrontendMetadataChange
+  onFrontendMetadataChange,
+  resolvedTheme
 }) => {
   const hasData = backendMetadata || frontendMetadata || !!rawJsonString;
 
@@ -109,11 +111,11 @@ export const PreviewArea: React.FC<PreviewAreaProps> = ({
         ) : (
           <div className="h-full">
             {activeTab === 'flow' && (
-              <LogicFlow metadata={backendMetadata} />
+              <LogicFlow metadata={backendMetadata} resolvedTheme={resolvedTheme} />
             )}
 
             {activeTab === 'preview' && (
-              <AppSimulator metadata={frontendMetadata} onMetadataChange={onFrontendMetadataChange} />
+              <AppSimulator metadata={frontendMetadata} onMetadataChange={onFrontendMetadataChange} resolvedTheme={resolvedTheme} />
             )}
 
             {activeTab === 'json' && (

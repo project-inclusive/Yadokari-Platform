@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { ProjectState, ChatMessage, BackendMetadata, FrontendMetadata } from './types/metadata';
 import { ChatConsole } from './components/ChatConsole';
 import { PreviewArea } from './components/PreviewArea';
@@ -433,8 +433,36 @@ function App() {
     rawJsonString: null
   });
 
+  // Theme management state
+  const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>(() => {
+    return (localStorage.getItem('theme') as 'light' | 'dark' | 'auto') || 'auto';
+  });
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark');
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+      if (theme === 'auto') {
+        setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
+      } else {
+        setResolvedTheme(theme);
+      }
+    };
+
+    handleChange();
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [theme]);
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark');
+    root.classList.add(resolvedTheme);
+    localStorage.setItem('theme', theme);
+  }, [resolvedTheme, theme]);
+
   const [isGenerating, setIsGenerating] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('deepseek/deepseek-v4-pro');
+  const [selectedModel, setSelectedModel] = useState('openai/gpt-5.4-mini');
 
   // 二段階ワークフロー用状態
   const [currentPhase, setCurrentPhase] = useState<'logic' | 'questions'>('logic');
@@ -465,6 +493,10 @@ function App() {
 
   const handleModifyLogic = () => {
     setHasLogicData(false);
+    setLogicConfirmed(false);
+    setQuestionsConfirmed(false);
+    setHasQuestionsData(false);
+    setCurrentPhase('logic');
     setProjectState(prev => ({
       ...prev,
       chatHistory: [
@@ -885,18 +917,67 @@ ${phaseInstruction}
   };
 
   return (
-    <div className="flex flex-col h-screen max-h-screen bg-[#070a13] text-slate-100 font-sans overflow-hidden">
-      <header className="flex items-center justify-between px-6 py-3.5 bg-[#0b0f19]/80 border-b border-slate-800/60 backdrop-blur-md shrink-0 z-10">
+    <div className="flex flex-col h-screen max-h-screen bg-app-bg text-slate-100 font-sans overflow-hidden transition-colors duration-200">
+      <header className="flex items-center justify-between px-6 py-3.5 bg-header-bg/80 border-b border-slate-800/60 backdrop-blur-md shrink-0 z-10 transition-colors duration-200">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-base shadow-lg shadow-indigo-500/20">
             Y
           </div>
           <div>
-            <h1 className="text-sm font-bold tracking-tight text-white m-0 leading-none">ヤドカリプラットフォーム</h1>
+            <h1 className="text-sm font-bold tracking-tight text-slate-100 m-0 leading-none">ヤドカリプラットフォーム</h1>
             <span className="text-[10px] text-slate-500 font-mono">v1.0.0 PROTOTYPE</span>
           </div>
         </div>
-        <ImportExport state={projectState} onImport={handleImport} />
+
+        <div className="flex items-center space-x-4">
+          {/* テーマセレクター (セグメントボタン) */}
+          <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5 space-x-0.5 transition-colors duration-200">
+            <button
+              onClick={() => setTheme('light')}
+              className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all flex items-center cursor-pointer ${
+                theme === 'light'
+                  ? 'bg-slate-850 text-indigo-400 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="ライトモード"
+            >
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+              </svg>
+              ライト
+            </button>
+            <button
+              onClick={() => setTheme('dark')}
+              className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all flex items-center cursor-pointer ${
+                theme === 'dark'
+                  ? 'bg-slate-850 text-indigo-400 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="ダークモード"
+            >
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+              ダーク
+            </button>
+            <button
+              onClick={() => setTheme('auto')}
+              className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all flex items-center cursor-pointer ${
+                theme === 'auto'
+                  ? 'bg-slate-850 text-indigo-400 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="システム設定に従う"
+            >
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              自動
+            </button>
+          </div>
+
+          <ImportExport state={projectState} onImport={handleImport} />
+        </div>
       </header>
 
       <main className="flex-1 flex overflow-hidden p-4 gap-4">
@@ -932,6 +1013,7 @@ ${phaseInstruction}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             onFrontendMetadataChange={handleFrontendMetadataChange}
+            resolvedTheme={resolvedTheme}
           />
         </section>
       </main>
