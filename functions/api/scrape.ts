@@ -1,8 +1,5 @@
 import * as cheerio from 'cheerio';
-
-if (typeof globalThis.DOMMatrix === 'undefined') {
-  (globalThis as any).DOMMatrix = class DOMMatrix {};
-}
+import { getDocumentProxy, extractText } from 'unpdf';
 
 export const onRequestPost: PagesFunction = async (context) => {
   try {
@@ -32,15 +29,14 @@ export const onRequestPost: PagesFunction = async (context) => {
 
     if (isPdf) {
       const arrayBuffer = await response.arrayBuffer();
-      const { PDFParse } = await import('pdf-parse');
-      const parser = new PDFParse({ data: arrayBuffer });
-      const textResult = await parser.getText();
-      const text = textResult.text || '';
+      const pdf = await getDocumentProxy(new Uint8Array(arrayBuffer));
+      const { text } = await extractText(pdf);
+      const textContent = Array.isArray(text) ? text.join('\n') : (text || '');
 
       return new Response(JSON.stringify({
         url,
         title: url.split('/').pop() || 'PDF Document',
-        content: text.trim()
+        content: textContent.trim()
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
