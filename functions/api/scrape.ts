@@ -1,5 +1,8 @@
 import * as cheerio from 'cheerio';
-import { PDFParse } from 'pdf-parse';
+
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  (globalThis as any).DOMMatrix = class DOMMatrix {};
+}
 
 export const onRequestPost: PagesFunction = async (context) => {
   try {
@@ -29,6 +32,7 @@ export const onRequestPost: PagesFunction = async (context) => {
 
     if (isPdf) {
       const arrayBuffer = await response.arrayBuffer();
+      const { PDFParse } = await import('pdf-parse');
       const parser = new PDFParse({ data: arrayBuffer });
       const textResult = await parser.getText();
       const text = textResult.text || '';
