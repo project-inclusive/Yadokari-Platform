@@ -188,7 +188,7 @@ OpenFisca の variable 生成で最もエラーが起きやすいのは `formula
   "definitions": {
     "variable": {
       "type": "object",
-      "required": ["name", "value_type", "entity", "definition_period", "label"],
+      "required": ["name", "value_type", "entity", "definition_period", "label", "documentation", "reference", "possible_values", "default_value", "formulas"],
       "properties": {
         "name": { "type": "string", "description": "【必須】日本語の変数名。例: '児童手当支給額'" },
         "label": { "type": "string", "description": "【必須】人間向けの短い説明" },
@@ -196,17 +196,23 @@ OpenFisca の variable 生成で最もエラーが起きやすいのは `formula
         "reference": { "type": "string", "description": "法的根拠URL" },
         "value_type": { "type": "string", "enum": ["float", "int", "bool", "str", "Enum"] },
         "possible_values": {
-          "type": "object",
-          "description": "Enum型の場合の値リスト。"
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["value", "label"],
+            "properties": {
+              "value": { "type": "string" },
+              "label": { "type": "string" }
+            }
+          }
         },
-        "default_value": { "type": ["string", "number", "boolean"], "description": "Enum型の場合はデフォルトのキー名" },
+        "default_value": { "type": "string", "description": "Enum型の場合はデフォルトのキー名" },
         "entity": { "type": "string", "enum": ["人物", "世帯"] },
         "definition_period": { "type": "string", "enum": ["DAY", "MONTH", "YEAR", "ETERNITY"] },
         "end": { "type": "string", "description": "制度の廃止日 (YYYY-MM-DD)" },
         "formulas": {
-          "type": "object",
-          "description": "適用開始日をキーとするロジック定義。通常は '0001-01-01' を使用",
-          "additionalProperties": {
+          "type": "array",
+          "items": {
             "$ref": "#/definitions/flowchart_formula"
           }
         }
@@ -214,30 +220,26 @@ OpenFisca の variable 生成で最もエラーが起きやすいのは `formula
     },
     "flowchart_formula": {
       "type": "object",
-      "required": ["dependencies", "start_node", "nodes"],
+      "required": ["date", "dependencies", "start_node", "nodes"],
       "properties": {
+        "date": { "type": "string", "description": "適用開始日 (YYYY-MM-DD)" },
         "dependencies": {
           "type": "object",
           "description": "ロジック内で使用する変数とパラメータの宣言",
+          "required": ["variables", "parameters"],
           "properties": {
             "variables": {
               "type": "array",
               "items": {
                 "type": "object",
-                "required": ["name", "entity", "period", "required"],
+                "required": ["name", "as", "entity", "period", "required", "default"],
                 "properties": {
                   "name": { "type": "string", "description": "日本語の参照変数名" },
                   "as": { "type": "string", "description": "ロジック内で使用する日本語のエイリアス名" },
                   "entity": { "type": "string", "enum": ["person", "household", "household_members"], "description": "参照範囲" },
                   "period": { "type": "string", "description": "参照期間" },
                   "required": { "type": "boolean", "description": "【必須】この変数が入力必須であるか" },
-                  "default": { "type": ["string", "number", "boolean"], "description": "requiredがfalseの場合のデフォルト値" }
-                },
-                "if": {
-                  "properties": { "required": { "const": false } }
-                },
-                "then": {
-                  "required": ["default"]
+                  "default": { "type": "string", "description": "requiredがfalseの場合のデフォルト値" }
                 }
               }
             },
@@ -256,12 +258,12 @@ OpenFisca の variable 生成で最もエラーが起きやすいのは `formula
         },
         "start_node": { "type": "string", "description": "フローチャートの開始ノード名" },
         "nodes": {
-          "type": "object",
-          "description": "フローチャートの各ノードの定義（有向グラフ）",
-          "additionalProperties": {
+          "type": "array",
+          "items": {
             "type": "object",
-            "required": ["type"],
+            "required": ["id", "type", "condition", "true_node", "false_node", "target", "expression", "next_node"],
             "properties": {
+              "id": { "type": "string", "description": "ノード名" },
               "type": { "type": "string", "enum": ["conditional", "assignment", "return"] },
               "condition": { "type": "string", "description": "ifの条件式（比較演算子のみ）" },
               "true_node": { "type": "string", "description": "条件が真の時の遷移先" },
@@ -269,7 +271,7 @@ OpenFisca の variable 生成で最もエラーが起きやすいのは `formula
               "target": { "type": "string", "description": "代入先のローカル変数名" },
               "expression": { 
                 "type": "string", 
-                "description": "代入式・返却値。使用可能な集約関数: 合計(変数), 最大(変数), 最小(変数), いずれかが真(変数), すべてが真(変数)" 
+                "description": "代入式・返却値。使用可能な集約関数: 合計(変数), 最大(変数), 最小(変数)" 
               },
               "next_node": { "type": "string", "description": "代入後の次の遷移先" }
             }
@@ -285,8 +287,15 @@ OpenFisca の variable 生成で最もエラーが起きやすいのは `formula
         "description": { "type": "string" },
         "unit": { "type": "string", "enum": ["currency-JPY", "/1", "year", "person"] },
         "values": {
-          "type": "object",
-          "additionalProperties": { "type": "number" }
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["date", "value"],
+            "properties": {
+              "date": { "type": "string" },
+              "value": { "type": "number" }
+            }
+          }
         }
       }
     },
@@ -303,8 +312,8 @@ OpenFisca の variable 生成で最もエラーが起きやすいのは `formula
             "properties": {
               "name": { "type": "string" },
               "period": { "type": "string" },
-              "input": { "type": "object" },
-              "output": { "type": "object" }
+              "input": { "type": "string", "description": "エスケープされたJSON文字列" },
+              "output": { "type": "string", "description": "エスケープされたJSON文字列" }
             }
           }
         }

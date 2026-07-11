@@ -9,6 +9,19 @@ interface ChatConsoleProps {
   onClearHistory: () => void;
   isGenerating: boolean;
   onScrapeUrl: (url: string) => Promise<string>;
+  
+  // ワークフローフェーズ用
+  currentPhase: 'logic' | 'questions';
+  logicConfirmed: boolean;
+  questionsConfirmed: boolean;
+  hasLogicData: boolean;
+  hasQuestionsData: boolean;
+  onConfirmLogic: () => void;
+  onModifyLogic: () => void;
+  onConfirmQuestions: () => void;
+  onModifyQuestions: () => void;
+  selectedModel: string;
+  setSelectedModel: (model: string) => void;
 }
 
 export const ChatConsole: React.FC<ChatConsoleProps> = ({
@@ -18,13 +31,23 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
   onSendMessage,
   onClearHistory,
   isGenerating,
-  onScrapeUrl
+  onScrapeUrl,
+  currentPhase,
+  logicConfirmed,
+  questionsConfirmed,
+  hasLogicData,
+  hasQuestionsData,
+  onConfirmLogic,
+  onModifyLogic,
+  onConfirmQuestions,
+  onModifyQuestions,
+  selectedModel,
+  setSelectedModel
 }) => {
   const [input, setInput] = useState('');
   const [urlInput, setUrlInput] = useState('');
   const [isScraping, setIsScraping] = useState(false);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState('openai/gpt-oss-120b');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,10 +67,9 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
     setScrapeError(null);
     try {
       const textContent = await onScrapeUrl(urlInput.trim());
-      // 取得したテキストをチャットのプロンプトに差し込む
       setInput(prev => {
         const prefix = prev ? prev + '\n\n' : '';
-        return `${prefix}以下のURLから取得した制度情報に基づいて、計算ロジックと一問一答フローを生成・修正してください。\n\n【取得テキスト】\n${textContent.slice(0, 3000)}`;
+        return `${prefix}以下のURLから取得した制度情報に基づいて、計算ロジックを生成・修正してください。\n\n【取得テキスト】\n${textContent.slice(0, 3000)}`;
       });
       setUrlInput('');
     } catch (err: any) {
@@ -79,7 +101,8 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
             onChange={(e) => setSelectedModel(e.target.value)}
             className="bg-slate-800 text-slate-300 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
-            <option value="openai/gpt-oss-120b">GPT OSS 120B (高性能)</option>
+            <option value="deepseek/deepseek-v4-pro">DeepSeek V4 Pro (推奨)</option>
+            <option value="openai/gpt-oss-120b">GPT OSS 120B (高品質)</option>
             <option value="google/gemma-4-31b-it:free">Gemma 4 31B IT (無料)</option>
             <option value="google/gemini-1.5-flash">Gemini 1.5 Flash (高速)</option>
             <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (高精度)</option>
@@ -95,6 +118,92 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
             </svg>
           </button>
+        </div>
+      </div>
+
+      {/* ワークフローフェーズパネル */}
+      <div className="p-4 bg-slate-950/40 border-b border-slate-800 flex flex-col space-y-3 shrink-0">
+        <div className="flex justify-between items-center">
+          <span className="text-[10px] font-bold text-slate-500 tracking-wider">フェーズ進捗</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {/* ロジックフェーズカード */}
+          <div className={`p-3 rounded-xl border transition-all ${
+            currentPhase === 'logic' 
+              ? 'bg-indigo-950/20 border-indigo-500/50 shadow-md shadow-indigo-500/5' 
+              : logicConfirmed 
+                ? 'bg-slate-900 border-emerald-500/30 opacity-80' 
+                : 'bg-slate-950/40 border-slate-800/80 opacity-50'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-[11px] font-bold ${
+                currentPhase === 'logic' ? 'text-indigo-400' : logicConfirmed ? 'text-emerald-400' : 'text-slate-400'
+              }`}>
+                1. 計算ロジック
+              </span>
+              {logicConfirmed && <span className="text-emerald-400 text-[10px] font-bold">✓ 確定</span>}
+            </div>
+            <p className="text-[9px] text-slate-500 mb-2 leading-relaxed">
+              まずは制度の計算ロジック（バックエンド）を定義します。
+            </p>
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                disabled={!hasLogicData || currentPhase !== 'logic' || isGenerating}
+                onClick={onModifyLogic}
+                className="flex-1 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] font-semibold text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+              >
+                修正
+              </button>
+              <button
+                type="button"
+                disabled={!hasLogicData || currentPhase !== 'logic' || isGenerating}
+                onClick={onConfirmLogic}
+                className="flex-1 py-1 rounded-lg bg-indigo-600 text-[10px] font-bold text-white hover:bg-indigo-500 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+              >
+                確定
+              </button>
+            </div>
+          </div>
+
+          {/* 質問フェーズカード */}
+          <div className={`p-3 rounded-xl border transition-all ${
+            currentPhase === 'questions' 
+              ? 'bg-purple-950/20 border-purple-500/50 shadow-md shadow-purple-500/5' 
+              : questionsConfirmed 
+                ? 'bg-slate-900 border-emerald-500/30 opacity-80' 
+                : 'bg-slate-950/40 border-slate-800/80 opacity-50'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-[11px] font-bold ${
+                currentPhase === 'questions' ? 'text-purple-400' : questionsConfirmed ? 'text-emerald-400' : 'text-slate-400'
+              }`}>
+                2. ユーザーへの質問
+              </span>
+              {questionsConfirmed && <span className="text-emerald-400 text-[10px] font-bold">✓ 確定</span>}
+            </div>
+            <p className="text-[9px] text-slate-500 mb-2 leading-relaxed">
+              一問一答画面（フロントマニフェスト）を定義します。
+            </p>
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                disabled={!hasQuestionsData || currentPhase !== 'questions' || isGenerating}
+                onClick={onModifyQuestions}
+                className="flex-1 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] font-semibold text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+              >
+                修正
+              </button>
+              <button
+                type="button"
+                disabled={!hasQuestionsData || currentPhase !== 'questions' || isGenerating}
+                onClick={onConfirmQuestions}
+                className="flex-1 py-1 rounded-lg bg-purple-600 text-[10px] font-bold text-white hover:bg-purple-500 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+              >
+                確定
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -197,14 +306,14 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                 e.preventDefault();
                 handleSubmit(e);
               }
             }}
             placeholder="AIに制度の設計・追加や、GUIの修正指示を送る..."
-            rows={1}
-            className="flex-1 bg-slate-900 border border-slate-800 focus:border-indigo-600 rounded-xl px-4 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none max-h-24 overflow-y-auto"
+            rows={Math.min(Math.max(input.split('\n').length, 1), 8)}
+            className="flex-1 bg-slate-900 border border-slate-800 focus:border-indigo-600 rounded-xl px-4 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none max-h-60 overflow-y-auto transition-all duration-150"
           />
           <button
             type="submit"

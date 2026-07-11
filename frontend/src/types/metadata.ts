@@ -1,6 +1,7 @@
 // --- Backend Metadata (OpenFisca schema) ---
 
 export interface Node {
+  id: string; // strictモード適合のためキー名からプロパティへ移行
   type: 'conditional' | 'assignment' | 'return';
   condition?: string;
   true_node?: string;
@@ -25,12 +26,18 @@ export interface FormulaDependencyParameter {
 }
 
 export interface FlowchartFormula {
+  date: string; // strictモード適合のためキー名からプロパティへ移行
   dependencies: {
     variables: FormulaDependencyVariable[];
     parameters: FormulaDependencyParameter[];
   };
   start_node: string;
-  nodes: Record<string, Node>;
+  nodes: Node[]; // Recordから配列に変更
+}
+
+export interface PossibleValue {
+  value: string;
+  label: string;
 }
 
 export interface Variable {
@@ -39,26 +46,31 @@ export interface Variable {
   documentation?: string;
   reference?: string;
   value_type: 'float' | 'int' | 'bool' | 'str' | 'Enum';
-  possible_values?: Record<string, string>;
+  possible_values?: PossibleValue[]; // Recordから配列に変更
   default_value?: string | number | boolean;
   entity: '人物' | '世帯';
   definition_period: 'DAY' | 'MONTH' | 'YEAR' | 'ETERNITY';
   end?: string;
-  formulas?: Record<string, FlowchartFormula>;
+  formulas?: FlowchartFormula[]; // Recordから配列に変更
+}
+
+export interface ParameterValue {
+  date: string;
+  value: number;
 }
 
 export interface Parameter {
   path: string;
   description: string;
   unit: 'currency-JPY' | '/1' | 'year' | 'person';
-  values: Record<string, number>;
+  values: ParameterValue[]; // Recordから配列に変更
 }
 
 export interface TestCase {
   name: string;
   period: string;
-  input: Record<string, any>;
-  output: Record<string, any>;
+  input: string | Record<string, any>;  // strictモード適合のため文字列として送られてくる可能性がある共用体
+  output: string | Record<string, any>; // 同上
 }
 
 export interface TestFile {
@@ -86,8 +98,8 @@ export interface Question {
   id: string;
   title: string;
   type: 'Selection' | 'Address' | 'Age' | 'PersonNum' | 'MultipleSelection';
-  options?: string[];
-  target_entities: string[]; // ['あなた', '配偶者', '子ども', '親'] など
+  options: string[];
+  target_entities: string[];
 }
 
 export interface Guard {
@@ -104,7 +116,8 @@ export interface NextCondition {
 }
 
 export interface FlowState {
-  nextQuestionKey?: string;
+  id: string; // strictモード適合のためキー名からプロパティへ移行
+  nextQuestionKey?: string | null;
   nextConditions?: NextCondition[];
   type?: 'member_transition';
   relation?: string;
@@ -113,14 +126,14 @@ export interface FlowState {
 
 export interface Flow {
   start_state: string;
-  states: Record<string, FlowState>;
+  states: FlowState[]; // Recordから配列に変更
 }
 
 export interface OpenFiscaMapping {
   question_id: string;
-  openfisca_variable?: string;
+  openfisca_variable: string;
   level: string;
-  transform?: string;
+  transform?: string | null;
   scale?: number;
   multiple_selection_map?: Record<string, string>;
 }

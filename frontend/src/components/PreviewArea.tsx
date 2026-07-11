@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import type { BackendMetadata, FrontendMetadata } from '../types/metadata';
-import { MermaidFlow } from './MermaidFlow';
+import { LogicFlow } from './LogicFlow';
 import { AppSimulator } from './AppSimulator';
 
 interface PreviewAreaProps {
@@ -8,16 +8,20 @@ interface PreviewAreaProps {
   frontendMetadata: FrontendMetadata | null;
   jsonParseError?: string | null;
   rawJsonString?: string | null;
+  activeTab: 'flow' | 'preview' | 'json';
+  setActiveTab: (tab: 'flow' | 'preview' | 'json') => void;
+  onFrontendMetadataChange?: (newMetadata: FrontendMetadata) => void;
 }
 
 export const PreviewArea: React.FC<PreviewAreaProps> = ({
   backendMetadata,
   frontendMetadata,
   jsonParseError,
-  rawJsonString
+  rawJsonString,
+  activeTab,
+  setActiveTab,
+  onFrontendMetadataChange
 }) => {
-  const [activeTab, setActiveTab] = useState<'flow' | 'preview' | 'json'>('flow');
-
   const hasData = backendMetadata || frontendMetadata || !!rawJsonString;
 
   return (
@@ -90,7 +94,7 @@ export const PreviewArea: React.FC<PreviewAreaProps> = ({
       )}
 
       {/* コンテンツ領域 */}
-      <div className="flex-1 p-5 overflow-y-auto bg-slate-900/30">
+      <div className={`flex-1 ${activeTab === 'flow' || activeTab === 'preview' ? 'overflow-hidden' : 'p-5 overflow-y-auto'} bg-slate-900/30`}>
         {!hasData ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-500 text-xs py-24 text-center">
             <svg className="w-12 h-12 mb-3 stroke-current text-slate-600" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -105,11 +109,11 @@ export const PreviewArea: React.FC<PreviewAreaProps> = ({
         ) : (
           <div className="h-full">
             {activeTab === 'flow' && (
-              <MermaidFlow metadata={backendMetadata} />
+              <LogicFlow metadata={backendMetadata} />
             )}
 
             {activeTab === 'preview' && (
-              <AppSimulator metadata={frontendMetadata} />
+              <AppSimulator metadata={frontendMetadata} onMetadataChange={onFrontendMetadataChange} />
             )}
 
             {activeTab === 'json' && (

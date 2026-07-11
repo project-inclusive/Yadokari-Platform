@@ -33,7 +33,9 @@ export function getChatRoute() {
           model: selectedModel,
           messages: messages,
           stream: true,
-          response_format: response_format
+          response_format: response_format,
+          max_tokens: 12288,
+          temperature: 0.1
         })
       })
 
