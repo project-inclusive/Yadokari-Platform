@@ -30,7 +30,15 @@ if (typeof globalThis.ReadableStream === 'function') {
       }
     }
     
-    globalThis.ReadableStream = PolyfilledReadableStream as any;
+    try {
+      Object.defineProperty(globalThis, 'ReadableStream', {
+        value: PolyfilledReadableStream,
+        writable: true,
+        configurable: true
+      });
+    } catch (e) {
+      (globalThis as any).ReadableStream = PolyfilledReadableStream;
+    }
   } catch (e) {}
 }
 
