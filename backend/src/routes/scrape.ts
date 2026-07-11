@@ -1,6 +1,77 @@
 import { Hono } from 'hono'
 import * as cheerio from 'cheerio'
-import { getDocumentProxy, extractText } from 'unpdf'
+
+// Shim to resolve Object.defineProperty errors on global prototypes in some environments
+if (typeof globalThis.ReadableStream === 'function') {
+  try {
+    const OriginalReadableStream: any = globalThis.ReadableStream;
+    class PolyfilledReadableStream extends OriginalReadableStream {}
+    
+    // Copy static properties
+    for (const key of Reflect.ownKeys(OriginalReadableStream)) {
+      if (key !== 'prototype' && key !== 'name' && key !== 'length') {
+        try {
+          Object.defineProperty(PolyfilledReadableStream, key, 
+            Object.getOwnPropertyDescriptor(OriginalReadableStream, key) || {}
+          );
+        } catch (e) {}
+      }
+    }
+    
+    // Ensure the prototype has necessary descriptors/methods
+    if (OriginalReadableStream.prototype) {
+      for (const key of Reflect.ownKeys(OriginalReadableStream.prototype)) {
+        if (key !== 'constructor') {
+          try {
+            Object.defineProperty(PolyfilledReadableStream.prototype, key,
+              Object.getOwnPropertyDescriptor(OriginalReadableStream.prototype, key) || {}
+            );
+          } catch (e) {}
+        }
+      }
+    }
+    
+    globalThis.ReadableStream = PolyfilledReadableStream as any;
+  } catch (e) {}
+}
+
+if (typeof globalThis.navigator === 'object' && globalThis.navigator !== null) {
+  try {
+    const originalNavigator = globalThis.navigator;
+    const polyfilledNavigator = Object.create(originalNavigator);
+    
+    let platform = '';
+    let userAgent = '';
+    try { platform = originalNavigator.platform || ''; } catch (e) {}
+    try { userAgent = originalNavigator.userAgent || ''; } catch (e) {}
+    
+    Object.defineProperty(polyfilledNavigator, 'platform', {
+      get() { return platform; },
+      set(val) { platform = val; },
+      configurable: true,
+      enumerable: true
+    });
+    
+    Object.defineProperty(polyfilledNavigator, 'userAgent', {
+      get() { return userAgent; },
+      set(val) { userAgent = val; },
+      configurable: true,
+      enumerable: true
+    });
+    
+    try {
+      globalThis.navigator = polyfilledNavigator;
+    } catch (e) {
+      try {
+        Object.defineProperty(globalThis, 'navigator', {
+          value: polyfilledNavigator,
+          writable: true,
+          configurable: true
+        });
+      } catch (e2) {}
+    }
+  } catch (e) {}
+}
 
 export function getScrapingRoute() {
   const route = new Hono()
@@ -28,6 +99,7 @@ export function getScrapingRoute() {
 
       if (isPdf) {
         const arrayBuffer = await response.arrayBuffer()
+        const { getDocumentProxy, extractText } = await import('unpdf')
         const pdf = await getDocumentProxy(new Uint8Array(arrayBuffer))
         const { text } = await extractText(pdf)
         const textContent = Array.isArray(text) ? text.join('\n') : (text || '')
