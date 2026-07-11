@@ -4,7 +4,14 @@ import * as cheerio from 'cheerio';
 if (typeof globalThis.ReadableStream === 'function') {
   try {
     const OriginalReadableStream: any = globalThis.ReadableStream;
-    class PolyfilledReadableStream extends OriginalReadableStream {}
+    
+    const PolyfilledReadableStream = function(this: any, ...args: any[]) {
+      return Reflect.construct(OriginalReadableStream, args, new.target || PolyfilledReadableStream);
+    };
+    
+    // Copy prototype chain
+    PolyfilledReadableStream.prototype = Object.create(OriginalReadableStream.prototype);
+    PolyfilledReadableStream.prototype.constructor = PolyfilledReadableStream;
     
     // Copy static properties
     for (const key of Reflect.ownKeys(OriginalReadableStream)) {
@@ -14,19 +21,6 @@ if (typeof globalThis.ReadableStream === 'function') {
             Object.getOwnPropertyDescriptor(OriginalReadableStream, key) || {}
           );
         } catch (e) {}
-      }
-    }
-    
-    // Ensure the prototype has necessary descriptors/methods
-    if (OriginalReadableStream.prototype) {
-      for (const key of Reflect.ownKeys(OriginalReadableStream.prototype)) {
-        if (key !== 'constructor') {
-          try {
-            Object.defineProperty(PolyfilledReadableStream.prototype, key,
-              Object.getOwnPropertyDescriptor(OriginalReadableStream.prototype, key) || {}
-            );
-          } catch (e) {}
-        }
       }
     }
     
