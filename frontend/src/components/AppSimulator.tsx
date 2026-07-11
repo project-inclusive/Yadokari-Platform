@@ -30,23 +30,43 @@ interface AppSimulatorProps {
 // 接続用ハンドルを備えたカスタム質問ノード
 const QuestionNode = ({ data, style, id }: any) => {
   const isEnd = id === 'COMPLETED_STATE';
+  const cardStyle = getQuestionNodeStyle(data.qType, data.isStart);
   return (
     <div style={style} className="relative">
       {/* ターゲットハンドル（入力矢印を受ける：すべてのノードに配置） */}
       <Handle
         type="target"
         position={Position.Top}
-        style={{ background: '#a78bfa', borderRadius: '50%', width: '8px', height: '8px', border: '1px solid #0f172a' }}
+        style={{
+          top: '-4px',
+          background: '#a78bfa',
+          borderRadius: '50%',
+          width: '8px',
+          height: '8px',
+          border: '1px solid #0f172a',
+          zIndex: 10
+        }}
       />
       
-      <div className="nodrag whitespace-pre-wrap">{data.label}</div>
+      {/* 装飾されたカード本体 */}
+      <div style={cardStyle} className="nodrag whitespace-pre-wrap">
+        {data.label}
+      </div>
       
       {/* ソースハンドル（出力矢印を出す：終了ノード以外に配置） */}
       {!isEnd && (
         <Handle
           type="source"
           position={Position.Bottom}
-          style={{ background: '#a78bfa', borderRadius: '50%', width: '8px', height: '8px', border: '1px solid #0f172a' }}
+          style={{
+            bottom: '-4px',
+            background: '#a78bfa',
+            borderRadius: '50%',
+            width: '8px',
+            height: '8px',
+            border: '1px solid #0f172a',
+            zIndex: 10
+          }}
         />
       )}
     </div>
@@ -153,8 +173,8 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
       rawNodes.push({
         id: q.id,
         type: 'question',
-        data: { label },
-        style: getQuestionNodeStyle(q.type, q.id === startStateId),
+        data: { label, qType: q.type, isStart: q.id === startStateId },
+        style: { width: 220 }, // 外殻はサイズのみ指定して二重装飾を回避
         position: { x: 0, y: 0 },
       });
     });
@@ -163,8 +183,8 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
     rawNodes.push({
       id: 'COMPLETED_STATE',
       type: 'question',
-      data: { label: '🏁 シミュレーション終了\n(判定結果出力)' },
-      style: getQuestionNodeStyle('completed', false),
+      data: { label: '🏁 シミュレーション終了\n(判定結果出力)', qType: 'completed', isStart: false },
+      style: { width: 220 },
       position: { x: 0, y: 0 },
     });
 

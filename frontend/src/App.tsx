@@ -513,6 +513,64 @@ function App() {
     setProjectState(importedState);
   };
 
+  const callLlm = async (messages: ChatMessage[], model: string): Promise<string> => {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages,
+        model,
+      })
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('ReadableStream not supported on this browser.');
+    }
+
+    const decoder = new TextDecoder();
+    let resultText = '';
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done && !value) break;
+
+      const chunk = decoder.decode(value || new Uint8Array(), { stream: !done });
+      buffer += chunk;
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (trimmed === 'data: [DONE]') break;
+        
+        if (trimmed.startsWith('data: ')) {
+          const jsonStr = trimmed.slice(6);
+          try {
+            const parsed = JSON.parse(jsonStr);
+            if (parsed.error) {
+              continue;
+            }
+            const text = parsed.choices?.[0]?.delta?.content || '';
+            resultText += text;
+          } catch (e) {
+            // Ignore parse errors for partial chunks
+          }
+        }
+      }
+      if (done) break;
+    }
+    return resultText;
+  };
+
   const handleScrapeUrl = async (url: string): Promise<string> => {
     try {
       const response = await fetch('/api/scrape', {
@@ -522,14 +580,31 @@ function App() {
       });
       
       if (!response.ok) {
-        const errData = await response.json();
+        const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || 'Failed to fetch content');
       }
 
       const data = await response.json();
-      return data.content;
+      const rawContent = data.content || '';
+
+      const extractionPrompt = `あなたは入力されたWebページのテキストから、給付制度や各種制度の「計算ロジック（支給条件、所得制限、給付額等）」および「申請フローや質問事項」に関連する重要情報のみを抽出するアシスタントです。
+ヘッダー、フッター、ナビゲーション、サイト紹介、プライバシーポリシーなどの無関係なテキストは一切除外し、制度設計に必要な情報のみを整理して抽出してください。
+余計な解説や挨拶、導入文、結び文は一切含めず、抽出したテキストのみを出力してください。
+
+【対象テキスト】
+${rawContent}`;
+
+      const extractedText = await callLlm([
+        { role: 'user', content: extractionPrompt }
+      ], 'openai/gpt-5.4-mini');
+
+      if (!extractedText.trim()) {
+        throw new Error('制度説明HPから有効な情報を抽出できませんでした。');
+      }
+
+      return extractedText;
     } catch (error: any) {
-      console.error('Scraping request failed:', error);
+      console.error('Scraping or extraction failed:', error);
       throw new Error(error.message || '接続エラーが発生しました。ローカルBFFサーバーが起動しているか確認してください。');
     }
   };
@@ -614,13 +689,18 @@ function App() {
     }
   };
 
-  const handleSendMessage = async (userMessage: string, model: string, overridePhase?: 'logic' | 'questions') => {
+  const handleSendMessage = async (
+    userMessage: string,
+    model: string,
+    overridePhase?: 'logic' | 'questions',
+    displayMessage?: string
+  ) => {
     if (isGenerating) return;
 
     setIsGenerating(true);
     let updatedHistory: ChatMessage[] = [
       ...projectState.chatHistory,
-      { role: 'user', content: userMessage }
+      { role: 'user', content: userMessage, displayContent: displayMessage }
     ];
     setProjectState(prev => ({
       ...prev,
@@ -664,9 +744,12 @@ ${phaseInstruction}
       const isJSONModeSupported = 
         model.includes('gpt-oss') || 
         model.includes('gpt-4') || 
+        model.includes('gpt-5') || 
         model.includes('claude-3-5') || 
         model.includes('gemini-1.5') || 
         model.includes('gemini-2.0') ||
+        model.includes('gemini-3.5') || 
+        model.includes('glm') ||
         model.includes('deepseek');
 
       const activeSchema = activePhase === 'logic' ? YADOKARI_JSON_SCHEMA_LOGIC : YADOKARI_JSON_SCHEMA_QUESTIONS;

@@ -5,7 +5,12 @@ interface ChatConsoleProps {
   chatHistory: ChatMessage[];
   projectName: string;
   onProjectNameChange: (name: string) => void;
-  onSendMessage: (message: string, model: string) => Promise<void>;
+  onSendMessage: (
+    message: string,
+    model: string,
+    overridePhase?: 'logic' | 'questions',
+    displayMessage?: string
+  ) => Promise<void>;
   onClearHistory: () => void;
   isGenerating: boolean;
   onScrapeUrl: (url: string) => Promise<string>;
@@ -49,14 +54,48 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
   const [isScraping, setIsScraping] = useState(false);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
+  const prevScrollTopRef = useRef(0);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isAtBottomRef.current) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    }
   }, [chatHistory, isGenerating]);
+
+  const handleScroll = () => {
+    const container = chatContainerRef.current;
+    if (!container) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const maxScroll = scrollHeight - clientHeight;
+    
+    // ユーザーが上方向にスクロールしたか
+    const isScrollingUp = scrollTop < prevScrollTopRef.current;
+    
+    // 最下部に到達したか（誤差15px）
+    const isBottom = maxScroll - scrollTop < 15;
+
+    if (isScrollingUp) {
+      isAtBottomRef.current = false;
+    } else if (isBottom) {
+      isAtBottomRef.current = true;
+    }
+
+    prevScrollTopRef.current = scrollTop;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isGenerating) return;
+    isAtBottomRef.current = true;
+    
+    const container = chatContainerRef.current;
+    if (container) {
+      prevScrollTopRef.current = container.scrollHeight - container.clientHeight;
+    }
+    
     onSendMessage(input.trim(), selectedModel);
     setInput('');
   };
@@ -66,14 +105,15 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
     setIsScraping(true);
     setScrapeError(null);
     try {
-      const textContent = await onScrapeUrl(urlInput.trim());
-      setInput(prev => {
-        const prefix = prev ? prev + '\n\n' : '';
-        return `${prefix}以下のURLから取得した制度情報に基づいて、計算ロジックを生成・修正してください。\n\n【取得テキスト】\n${textContent.slice(0, 3000)}`;
-      });
+      const extractedText = await onScrapeUrl(urlInput.trim());
+      
+      const userMessageText = `以下の制度情報に基づいて、計算ロジックを生成・修正してください。\n\n【制度情報（抽出済）】\n${extractedText}`;
+      const displayMessageText = `制度説明HP (URL: ${urlInput.trim()}) から情報を読み込みました。`;
+      
+      await onSendMessage(userMessageText, selectedModel, 'logic', displayMessageText);
       setUrlInput('');
     } catch (err: any) {
-      setScrapeError(err.message || 'URLの読み込みに失敗しました。CORS制限またはサーバーエラーの可能性があります。');
+      setScrapeError(err.message || 'URLの読み込みまたはメタデータ生成に失敗しました。');
     } finally {
       setIsScraping(false);
     }
@@ -102,6 +142,9 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
             className="bg-slate-800 text-slate-300 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
             <option value="deepseek/deepseek-v4-pro">DeepSeek V4 Pro (推奨)</option>
+            <option value="google/gemini-3.5-flash">Gemini 3.5 Flash</option>
+            <option value="z-ai/glm-5.2">GLM 5.2</option>
+            <option value="openai/gpt-5.4-mini">GPT 5.4 Mini</option>
             <option value="openai/gpt-oss-120b">GPT OSS 120B (高品質)</option>
             <option value="google/gemma-4-31b-it:free">Gemma 4 31B IT (無料)</option>
             <option value="google/gemini-1.5-flash">Gemini 1.5 Flash (高速)</option>
@@ -241,7 +284,11 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
       </div>
 
       {/* メッセージ表示エリア */}
-      <div className="flex-1 p-5 overflow-y-auto space-y-4 bg-slate-900/30">
+      <div 
+        ref={chatContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 p-5 overflow-y-auto space-y-4 bg-slate-900/30"
+      >
         {chatHistory.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-500 text-xs space-y-3 text-center px-4 py-12">
             <div className="w-12 h-12 rounded-2xl bg-indigo-950/40 border border-indigo-900/30 flex items-center justify-center text-indigo-400">
@@ -279,8 +326,15 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
                     : 'bg-slate-850 border border-slate-850 text-slate-200 rounded-tl-none font-sans'
                 }`}
               >
-                {/* メッセージ内にJSONが含まれている場合、コードブロックを除外して表示するか、折りたたむようにする */}
-                <MessageContent content={msg.content} />
+                {msg.role === 'user' ? (
+                  <span className="whitespace-pre-wrap">{msg.displayContent || msg.content}</span>
+                ) : (
+                  <MessageContent
+                    content={msg.content}
+                    isLast={index === chatHistory.length - 1}
+                    isGenerating={isGenerating}
+                  />
+                )}
               </div>
             </div>
           ))
@@ -328,40 +382,38 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
   );
 };
 
-// メッセージ内の巨大なJSONブロックを美しく非表示/折りたたむための内部コンポーネント
-const MessageContent: React.FC<{ content: string }> = ({ content }) => {
-  const jsonRegex = /```json\s*([\s\S]*?)```/g;
-  const parts = [];
-  let lastIndex = 0;
-  let match;
+// メッセージ内の巨大なJSONブロックを非表示にするための内部コンポーネント
+const MessageContent: React.FC<{ content: string; isLast: boolean; isGenerating: boolean }> = ({ content, isLast, isGenerating }) => {
+  const cleanContent = (text: string): string => {
+    let cleaned = text;
 
-  while ((match = jsonRegex.exec(content)) !== null) {
-    // マッチ前のテキストを追加
-    if (match.index > lastIndex) {
-      parts.push(<span key={lastIndex} className="whitespace-pre-wrap">{content.substring(lastIndex, match.index)}</span>);
+    // 1. ```json ... ``` のブロックを除去
+    cleaned = cleaned.replace(/```json\s*([\s\S]*?)(?:```|$)/g, '');
+
+    // 2. もし残ったテキストが `{` で始まっている場合（生JSON）、または元のテキストが `{` で始まっている場合、全体を除去
+    if (cleaned.trim().startsWith('{') || text.trim().startsWith('{')) {
+      cleaned = '';
     }
 
-    // JSONブロックを折りたたみ式UIとして追加
-    const jsonStr = match[1];
-    const key = match.index;
-    parts.push(
-      <details key={key} className="my-2 bg-slate-950/80 rounded-lg border border-slate-800 overflow-hidden text-[11px] font-mono">
-        <summary className="px-3 py-2 bg-slate-950 text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer select-none">
-          ⚙ 生成された定義データ (JSON) を見る
-        </summary>
-        <div className="p-3 overflow-x-auto text-slate-300 border-t border-slate-800 max-h-60">
-          <pre>{jsonStr}</pre>
+    return cleaned.trim();
+  };
+
+  const cleaned = cleanContent(content);
+
+  if (!cleaned) {
+    if (isLast && isGenerating) {
+      return (
+        <div className="flex items-center space-x-1.5 text-slate-400 italic">
+          <svg className="animate-spin h-3 w-3 text-indigo-400" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>定義データを設計中...</span>
         </div>
-      </details>
-    );
-
-    lastIndex = jsonRegex.lastIndex;
+      );
+    }
+    return <span className="text-slate-400 italic">⚙️ 定義データを生成・更新しました。詳細は右側の「定義データ」タブおよびプレビューを確認してください。</span>;
   }
 
-  // 残りのテキストを追加
-  if (lastIndex < content.length) {
-    parts.push(<span key={lastIndex} className="whitespace-pre-wrap">{content.substring(lastIndex)}</span>);
-  }
-
-  return <div className="space-y-1">{parts.length > 0 ? parts : <span className="whitespace-pre-wrap">{content}</span>}</div>;
+  return <span className="whitespace-pre-wrap">{cleaned}</span>;
 };

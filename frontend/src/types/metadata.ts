@@ -151,6 +151,7 @@ export interface FrontendMetadata {
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  displayContent?: string;
 }
 
 export interface ProjectState {

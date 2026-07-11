@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { PDFParse } from 'pdf-parse';
 
 export const onRequestPost: PagesFunction = async (context) => {
   try {
@@ -19,6 +20,25 @@ export const onRequestPost: PagesFunction = async (context) => {
     if (!response.ok) {
       return new Response(JSON.stringify({ error: `Failed to fetch URL: ${response.statusText}` }), {
         status: response.status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    const isPdf = contentType.toLowerCase().includes('application/pdf') || url.toLowerCase().endsWith('.pdf');
+
+    if (isPdf) {
+      const arrayBuffer = await response.arrayBuffer();
+      const parser = new PDFParse({ data: arrayBuffer });
+      const textResult = await parser.getText();
+      const text = textResult.text || '';
+
+      return new Response(JSON.stringify({
+        url,
+        title: url.split('/').pop() || 'PDF Document',
+        content: text.trim()
+      }), {
+        status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
     }

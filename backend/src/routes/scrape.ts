@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import * as cheerio from 'cheerio'
+import { PDFParse } from 'pdf-parse'
 
 export function getScrapingRoute() {
   const route = new Hono()
@@ -20,6 +21,22 @@ export function getScrapingRoute() {
 
       if (!response.ok) {
         return c.json({ error: `Failed to fetch URL: ${response.statusText}` }, response.status as any)
+      }
+
+      const contentType = response.headers.get('content-type') || ''
+      const isPdf = contentType.toLowerCase().includes('application/pdf') || url.toLowerCase().endsWith('.pdf')
+
+      if (isPdf) {
+        const arrayBuffer = await response.arrayBuffer()
+        const parser = new PDFParse({ data: arrayBuffer })
+        const textResult = await parser.getText()
+        const text = textResult.text || ''
+
+        return c.json({
+          url,
+          title: url.split('/').pop() || 'PDF Document',
+          content: text.trim()
+        })
       }
 
       const html = await response.text()

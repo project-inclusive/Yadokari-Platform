@@ -6,6 +6,8 @@ import {
   Background,
   BackgroundVariant,
   MarkerType,
+  Handle,
+  Position,
 } from '@xyflow/react';
 import type {
   Node as FlowNode,
@@ -18,6 +20,54 @@ import type { BackendMetadata, Parameter, FormulaDependencyParameter } from '../
 interface LogicFlowProps {
   metadata: BackendMetadata | null;
 }
+
+// 接続用ハンドルを備えたカスタムロジックノード
+const LogicNode = ({ data, style, id }: any) => {
+  const isReturn = id.startsWith('return') || data.label.includes('結果返却') || data.label.includes('✅');
+  const cardStyle = getNodeStyle(data.nType, data.isStart);
+  return (
+    <div style={style} className="relative font-mono">
+      <Handle
+        type="target"
+        position={Position.Top}
+        style={{
+          top: '-4px',
+          background: '#818cf8',
+          borderRadius: '50%',
+          width: '8px',
+          height: '8px',
+          border: '1px solid #0f172a',
+          zIndex: 10
+        }}
+      />
+      
+      {/* 装飾されたカード本体 */}
+      <div style={cardStyle} className="nodrag whitespace-pre-wrap">
+        {data.label}
+      </div>
+      
+      {!isReturn && (
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          style={{
+            bottom: '-4px',
+            background: '#818cf8',
+            borderRadius: '50%',
+            width: '8px',
+            height: '8px',
+            border: '1px solid #0f172a',
+            zIndex: 10
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+const nodeTypes = {
+  logic: LogicNode,
+};
 
 // dagre 自動レイアウト関数
 const getLayoutedElements = (nodes: FlowNode[], edges: FlowEdge[], direction = 'TB') => {
@@ -213,8 +263,9 @@ export const LogicFlow: React.FC<LogicFlowProps> = ({ metadata }) => {
 
       rawNodes.push({
         id: node.id,
-        data: { label },
-        style: getNodeStyle(node.type, node.id === startNodeId),
+        type: 'logic',
+        data: { label, nType: node.type, isStart: node.id === startNodeId },
+        style: { width: 220 }, // 外殻はサイズのみ指定して二重装飾を回避
         position: { x: 0, y: 0 },
       });
 
@@ -288,6 +339,7 @@ export const LogicFlow: React.FC<LogicFlowProps> = ({ metadata }) => {
         <ReactFlow
           nodes={nodes}
           edges={edges}
+          nodeTypes={nodeTypes}
           fitView
           fitViewOptions={{ padding: 0.3 }}
           colorMode="dark"
