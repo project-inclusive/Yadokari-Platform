@@ -18,7 +18,7 @@ export const onRequestPost: PagesFunction<{ OPENROUTER_API_KEY: string }> = asyn
       });
     }
 
-    const selectedModel = model || 'openai/gpt-5.4-mini';
+    const selectedModel = model || 'z-ai/glm-5.2';
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',

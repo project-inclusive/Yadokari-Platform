@@ -103,8 +103,11 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
   const handleScrape = async () => {
     if (!urlInput.trim() || isScraping) return;
     
-    const url = urlInput.trim();
-    if (url.toLowerCase().endsWith('.pdf')) {
+    const urls = urlInput.trim().split('\n').map(u => u.trim()).filter(u => u.length > 0);
+    if (urls.length === 0) return;
+
+    const hasPdf = urls.some(u => u.toLowerCase().endsWith('.pdf'));
+    if (hasPdf) {
       setScrapeError('PDFファイルからのテキスト自動読み込みには現在対応していません。お手数ですが、PDFのテキスト内容をコピーして、メッセージ欄に直接貼り付けて送信してください。');
       return;
     }
@@ -112,10 +115,27 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
     setIsScraping(true);
     setScrapeError(null);
     try {
-      const extractedText = await onScrapeUrl(url);
+      const results = await Promise.all(
+        urls.map(async (url) => {
+          try {
+            const text = await onScrapeUrl(url);
+            return { url, text, success: true, error: null };
+          } catch (err: any) {
+            return { url, text: '', success: false, error: err.message || '読み込み失敗' };
+          }
+        })
+      );
+
+      const failed = results.filter(r => !r.success);
+      if (failed.length > 0) {
+        const errorMsg = failed.map(f => `${f.url}: ${f.error}`).join('\n');
+        throw new Error(`以下のURLの読み込みに失敗しました：\n${errorMsg}`);
+      }
+
+      const combinedText = results.map(r => `■ URL: ${r.url}\n${r.text}`).join('\n\n');
+      const userMessageText = `以下の制度情報に基づいて、計算ロジックを生成・修正してください。\n\n【制度情報（抽出済）】\n${combinedText}`;
       
-      const userMessageText = `以下の制度情報に基づいて、計算ロジックを生成・修正してください。\n\n【制度情報（抽出済）】\n${extractedText}`;
-      const displayMessageText = `制度説明HP (URL: ${url}) から情報を読み込みました。`;
+      const displayMessageText = `制度説明HP (${urls.length}件のURL) から情報を読み込みました。\n${urls.map(u => `- ${u}`).join('\n')}`;
       
       await onSendMessage(userMessageText, selectedModel, 'logic', displayMessageText);
       setUrlInput('');
@@ -135,7 +155,7 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
             type="text"
             value={projectName}
             onChange={(e) => onProjectNameChange(e.target.value)}
-            placeholder="無題のカスタムアプリ"
+            placeholder="制度名を入力（例：子育て特別手当、生活保護など）"
             className="w-full bg-transparent text-sm font-semibold text-slate-100 placeholder-slate-500 border-0 focus:ring-0 focus:outline-none p-0"
           />
           <div className="text-[10px] text-indigo-400 font-medium">YADOKARI PLATFORM CONSOLE</div>
@@ -148,10 +168,10 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
             onChange={(e) => setSelectedModel(e.target.value)}
             className="bg-slate-800 text-slate-300 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
-            <option value="openai/gpt-5.4-mini">GPT 5.4 Mini (推奨)</option>
+            <option value="z-ai/glm-5.2">GLM 5.2 (推奨)</option>
+            <option value="openai/gpt-5.4-mini">GPT 5.4 Mini</option>
             <option value="deepseek/deepseek-v4-pro">DeepSeek V4 Pro</option>
             <option value="google/gemini-3.5-flash">Gemini 3.5 Flash</option>
-            <option value="z-ai/glm-5.2">GLM 5.2</option>
             <option value="openai/gpt-oss-120b">GPT OSS 120B (高品質)</option>
             <option value="google/gemma-4-31b-it:free">Gemma 4 31B IT (無料)</option>
             <option value="google/gemini-1.5-flash">Gemini 1.5 Flash (高速)</option>
@@ -257,38 +277,6 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
         </div>
       </div>
 
-      {/* URLスクレイパーバー */}
-      <div className="px-5 py-2.5 bg-slate-950 border-b border-slate-900 flex flex-col space-y-1.5 shrink-0">
-        <div className="flex items-center space-x-2">
-          <input
-            type="url"
-            value={urlInput}
-            onChange={(e) => setUrlInput(e.target.value)}
-            placeholder="制度説明が記載されているURLを入力して読み込み..."
-            className="flex-1 bg-slate-900 border border-slate-800 focus:border-indigo-600 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-slate-500"
-          />
-          <button
-            onClick={handleScrape}
-            disabled={isScraping || !urlInput.trim()}
-            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white text-xs font-semibold rounded-lg shadow transition-colors flex items-center shrink-0"
-          >
-            {isScraping ? (
-              <>
-                <svg className="animate-spin h-3 w-3 mr-1.5 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                読込中...
-              </>
-            ) : (
-              'URL読込'
-            )}
-          </button>
-        </div>
-        {scrapeError && (
-          <div className="text-[10px] text-red-400 font-medium">{scrapeError}</div>
-        )}
-      </div>
 
       {/* メッセージ表示エリア */}
       <div 
@@ -303,7 +291,7 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
             </div>
             <div className="space-y-1">
               <p className="font-semibold text-slate-300">ヤドカリプラットフォームへようこそ！</p>
-              <p className="text-slate-400">上のバーから制度のURLをインポートするか、<br/>下記のようにAIへ直接話しかけて作成を開始してください。</p>
+              <p className="text-slate-400">メッセージ欄の上のフォームから制度のURLをインポートするか、<br/>下記のようにAIへ直接話しかけて作成を開始してください。</p>
             </div>
             <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-left space-y-2 text-slate-400 w-full max-w-[340px]">
               <button 
@@ -360,6 +348,45 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
         <div ref={chatEndRef} />
       </div>
 
+      {/* URLスクレイパーバー */}
+      <div className="px-5 py-2.5 bg-slate-950 border-t border-slate-900 flex flex-col space-y-1.5 shrink-0">
+        <div className="flex items-start space-x-2">
+          <textarea
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            placeholder="制度説明が記載されているURLを入力して読み込み...（複数ある場合は改行して入力）"
+            rows={Math.min(Math.max(urlInput.split('\n').length, 1), 5)}
+            className="flex-1 bg-slate-900 border border-slate-800 focus:border-indigo-600 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-slate-500 resize-none max-h-32 overflow-y-auto"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                handleScrape();
+              }
+            }}
+          />
+          <button
+            onClick={handleScrape}
+            disabled={isScraping || !urlInput.trim()}
+            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white text-xs font-semibold rounded-lg shadow transition-colors flex items-center shrink-0 self-end"
+          >
+            {isScraping ? (
+              <>
+                <svg className="animate-spin h-3 w-3 mr-1.5 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                読込中...
+              </>
+            ) : (
+              'URL読込'
+            )}
+          </button>
+        </div>
+        {scrapeError && (
+          <div className="text-[10px] text-red-400 font-medium whitespace-pre-wrap">{scrapeError}</div>
+        )}
+      </div>
+
       {/* 入力フォーム */}
       <form onSubmit={handleSubmit} className="p-4 bg-slate-950 border-t border-slate-900 shrink-0">
         <div className="flex items-center space-x-2">
@@ -405,6 +432,102 @@ const MessageContent: React.FC<{ content: string; isLast: boolean; isGenerating:
     return cleaned.trim();
   };
 
+  const parseInlineMarkdown = (text: string) => {
+    const parts = [];
+    let remaining = text;
+    let key = 0;
+
+    while (remaining.length > 0) {
+      const boldIndex = remaining.indexOf('**');
+      const codeIndex = remaining.indexOf('`');
+
+      if (boldIndex === -1 && codeIndex === -1) {
+        parts.push(remaining);
+        break;
+      }
+
+      const isBoldFirst = boldIndex !== -1 && (codeIndex === -1 || boldIndex < codeIndex);
+
+      if (isBoldFirst) {
+        if (boldIndex > 0) {
+          parts.push(remaining.substring(0, boldIndex));
+        }
+        remaining = remaining.substring(boldIndex + 2);
+        const closeBoldIndex = remaining.indexOf('**');
+        if (closeBoldIndex !== -1) {
+          parts.push(
+            <strong key={key++} className="font-semibold text-slate-100">
+              {remaining.substring(0, closeBoldIndex)}
+            </strong>
+          );
+          remaining = remaining.substring(closeBoldIndex + 2);
+        } else {
+          parts.push('**' + remaining);
+          break;
+        }
+      } else {
+        if (codeIndex > 0) {
+          parts.push(remaining.substring(0, codeIndex));
+        }
+        remaining = remaining.substring(codeIndex + 1);
+        const closeCodeIndex = remaining.indexOf('`');
+        if (closeCodeIndex !== -1) {
+          parts.push(
+            <code key={key++} className="bg-slate-800 text-indigo-300 px-1 py-0.5 rounded font-mono text-[10px]">
+              {remaining.substring(0, closeCodeIndex)}
+            </code>
+          );
+          remaining = remaining.substring(closeCodeIndex + 1);
+        } else {
+          parts.push('`' + remaining);
+          break;
+        }
+      }
+    }
+
+    return parts.length === 0 ? text : parts;
+  };
+
+  const renderMarkdown = (text: string) => {
+    const lines = text.split('\n');
+    return lines.map((line, index) => {
+      // 1. Horizontal Rule
+      if (line.trim() === '---') {
+        return <hr key={index} className="my-3 border-t border-slate-800" />;
+      }
+
+      // 2. Headings (e.g., ### Heading)
+      const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+      if (headingMatch) {
+        const level = headingMatch[1].length;
+        const headingText = headingMatch[2];
+        const headingClass = 
+          level === 1 ? "text-sm font-bold mt-2.5 mb-1.5 text-indigo-400" :
+          level === 2 ? "text-xs font-bold mt-2 mb-1 text-slate-200" :
+          "text-[11px] font-bold mt-1.5 mb-1 text-slate-300";
+        return <div key={index} className={headingClass}>{parseInlineMarkdown(headingText)}</div>;
+      }
+
+      // 3. Unordered list items (e.g., - item or * item)
+      const listMatch = line.match(/^[-*]\s+(.*)$/);
+      if (listMatch) {
+        const listText = listMatch[1];
+        return (
+          <li key={index} className="ml-4 list-disc my-0.5 text-slate-300">
+            {parseInlineMarkdown(listText)}
+          </li>
+        );
+      }
+
+      // 4. Default paragraph line
+      return (
+        <p key={index} className="my-0.5 min-h-[1em] text-slate-250">
+          {parseInlineMarkdown(line)}
+        </p>
+      );
+    });
+  };
+
   const cleaned = cleanContent(content);
 
   if (!cleaned) {
@@ -422,5 +545,5 @@ const MessageContent: React.FC<{ content: string; isLast: boolean; isGenerating:
     return <span className="text-slate-400 italic">⚙️ 定義データを生成・更新しました。詳細は右側の「定義データ」タブおよびプレビューを確認してください。</span>;
   }
 
-  return <span className="whitespace-pre-wrap">{cleaned}</span>;
+  return <div className="space-y-0.5">{renderMarkdown(cleaned)}</div>;
 };

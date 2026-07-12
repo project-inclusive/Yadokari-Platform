@@ -164,13 +164,16 @@ OpenFisca の variable 生成で最もエラーが起きやすいのは `formula
   "title": "OpenFiscaJapanFlowchartSchema",
   "description": "if/else分岐、加減乗除、および集約関数のみで構成され、一意にフローチャート化できるOpenFisca用定義スキーマ",
   "type": "object",
-  "required": ["variables", "parameters", "tests"],
+  "required": ["variables", "calculation_flow", "parameters", "tests"],
   "properties": {
     "variables": {
       "type": "array",
       "items": {
         "$ref": "#/definitions/variable"
       }
+    },
+    "calculation_flow": {
+      "$ref": "#/definitions/calculation_flow"
     },
     "parameters": {
       "type": "array",
@@ -188,7 +191,7 @@ OpenFisca の variable 生成で最もエラーが起きやすいのは `formula
   "definitions": {
     "variable": {
       "type": "object",
-      "required": ["name", "value_type", "entity", "definition_period", "label", "documentation", "reference", "possible_values", "default_value", "formulas"],
+      "required": ["name", "value_type", "entity", "definition_period", "label", "documentation", "reference", "possible_values", "default_value"],
       "properties": {
         "name": { "type": "string", "description": "【必須】日本語の変数名。例: '児童手当支給額'" },
         "label": { "type": "string", "description": "【必須】人間向けの短い説明" },
@@ -209,20 +212,14 @@ OpenFisca の variable 生成で最もエラーが起きやすいのは `formula
         "default_value": { "type": "string", "description": "Enum型の場合はデフォルトのキー名" },
         "entity": { "type": "string", "enum": ["人物", "世帯"] },
         "definition_period": { "type": "string", "enum": ["DAY", "MONTH", "YEAR", "ETERNITY"] },
-        "end": { "type": "string", "description": "制度の廃止日 (YYYY-MM-DD)" },
-        "formulas": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/flowchart_formula"
-          }
-        }
+        "end": { "type": "string", "description": "制度の廃止日 (YYYY-MM-DD)" }
       }
     },
-    "flowchart_formula": {
+    "calculation_flow": {
       "type": "object",
-      "required": ["date", "dependencies", "start_node", "nodes"],
+      "required": ["goal_variable", "dependencies", "start_node", "nodes"],
       "properties": {
-        "date": { "type": "string", "description": "適用開始日 (YYYY-MM-DD)" },
+        "goal_variable": { "type": "string", "description": "最終的な計算結果となる変数名。例: '児童手当支給額'" },
         "dependencies": {
           "type": "object",
           "description": "ロジック内で使用する変数とパラメータの宣言",
@@ -339,84 +336,120 @@ OpenFisca の variable 生成で最もエラーが起きやすいのは `formula
       "documentation": "児童の年齢と世帯の所得状況に応じて計算される児童手当",
       "value_type": "float",
       "entity": "人物",
-      "definition_period": "MONTH",
-      "formulas": {
-        "2024-04-01": {
-          "dependencies": {
-            "variables": [
-              { 
-                "name": "年齢", 
-                "entity": "person", 
-                "period": "current", 
-                "required": true 
-              },
-              { 
-                "name": "所得", 
-                "entity": "household_members", 
-                "period": "current", 
-                "required": false, 
-                "default": 0 
-              }
-            ],
-            "parameters": [
-              { "path": "パラメータ：三歳未満支給額", "as": "三歳未満支給額" },
-              { "path": "パラメータ：三歳以上支給額", "as": "三歳以上支給額" },
-              { "path": "パラメータ：所得制限限度額", "as": "所得制限限度額" }
-            ]
-          },
-          "start_node": "世帯合計所得の計算",
-          "nodes": {
-            "世帯合計所得の計算": {
-              "type": "assignment",
-              "target": "世帯合計所得",
-              "expression": "合計(所得)",
-              "next_node": "対象年齢チェック"
-            },
-            "対象年齢チェック": {
-              "type": "conditional",
-              "condition": "年齢 < 15",
-              "true_node": "所得制限チェック",
-              "false_node": "不支給の代入"
-            },
-            "所得制限チェック": {
-              "type": "conditional",
-              "condition": "世帯合計所得 < 所得制限限度額",
-              "true_node": "乳幼児判定",
-              "false_node": "不支給の代入"
-            },
-            "乳幼児判定": {
-              "type": "conditional",
-              "condition": "年齢 < 3",
-              "true_node": "乳児手当額の代入",
-              "false_node": "幼児手当額の代入"
-            },
-            "乳児手当額の代入": {
-              "type": "assignment",
-              "target": "支給額",
-              "expression": "三歳未満支給額",
-              "next_node": "結果の返却"
-            },
-            "幼児手当額の代入": {
-              "type": "assignment",
-              "target": "支給額",
-              "expression": "三歳以上支給額",
-              "next_node": "結果の返却"
-            },
-            "不支給の代入": {
-              "type": "assignment",
-              "target": "支給額",
-              "expression": "0",
-              "next_node": "結果の返却"
-            },
-            "結果の返却": {
-              "type": "return",
-              "expression": "支給額"
-            }
-          }
-        }
-      }
+      "definition_period": "MONTH"
     }
   ],
+  "calculation_flow": {
+    "goal_variable": "児童手当支給額",
+    "dependencies": {
+      "variables": [
+        { 
+          "name": "年齢", 
+          "as": "年齢",
+          "entity": "person", 
+          "period": "current", 
+          "required": true,
+          "default": ""
+        },
+        { 
+          "name": "所得", 
+          "as": "所得",
+          "entity": "household_members", 
+          "period": "current", 
+          "required": false, 
+          "default": "0" 
+        }
+      ],
+      "parameters": [
+        { "path": "パラメータ：三歳未満支給額", "as": "三歳未満支給額" },
+        { "path": "パラメータ：三歳以上支給額", "as": "三歳以上支給額" },
+        { "path": "パラメータ：所得制限限度額", "as": "所得制限限度額" }
+      ]
+    },
+    "start_node": "世帯合計所得の計算",
+    "nodes": [
+      {
+        "id": "世帯合計所得の計算",
+        "type": "assignment",
+        "condition": "",
+        "true_node": "",
+        "false_node": "",
+        "target": "世帯合計所得",
+        "expression": "合計(所得)",
+        "next_node": "対象年齢チェック"
+      },
+      {
+        "id": "対象年齢チェック",
+        "type": "conditional",
+        "condition": "年齢 < 15",
+        "true_node": "所得制限チェック",
+        "false_node": "不支給の代入",
+        "target": "",
+        "expression": "",
+        "next_node": ""
+      },
+      {
+        "id": "所得制限チェック",
+        "type": "conditional",
+        "condition": "世帯合計所得 < 所得制限限度額",
+        "true_node": "乳幼児判定",
+        "false_node": "不支給の代入",
+        "target": "",
+        "expression": "",
+        "next_node": ""
+      },
+      {
+        "id": "乳幼児判定",
+        "type": "conditional",
+        "condition": "年齢 < 3",
+        "true_node": "乳児手当額の代入",
+        "false_node": "幼児手当額の代入",
+        "target": "",
+        "expression": "",
+        "next_node": ""
+      },
+      {
+        "id": "乳児手当額の代入",
+        "type": "assignment",
+        "condition": "",
+        "true_node": "",
+        "false_node": "",
+        "target": "支給額",
+        "expression": "三歳未満支給額",
+        "next_node": "結果の返却"
+      },
+      {
+        "id": "幼児手当額の代入",
+        "type": "assignment",
+        "condition": "",
+        "true_node": "",
+        "false_node": "",
+        "target": "支給額",
+        "expression": "三歳以上支給額",
+        "next_node": "結果の返却"
+      },
+      {
+        "id": "不支給の代入",
+        "type": "assignment",
+        "condition": "",
+        "true_node": "",
+        "false_node": "",
+        "target": "支給額",
+        "expression": "0",
+        "next_node": "結果の返却"
+      },
+      {
+        "id": "結果の返却",
+        "type": "return",
+        "condition": "",
+        "true_node": "",
+        "false_node": "",
+        "target": "",
+        "expression": "支給額",
+        "next_node": ""
+      }
+    ]
+  },
   "parameters": [
     {
       "path": "パラメータ：三歳未満支給額",

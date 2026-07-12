@@ -141,27 +141,16 @@ const getNodeStyle = (type: string, isStart: boolean) => {
 export const LogicFlow: React.FC<LogicFlowProps> = ({ metadata, resolvedTheme }) => {
   const [nodes, setNodes] = useState<FlowNode[]>([]);
   const [edges, setEdges] = useState<FlowEdge[]>([]);
-  const [selectedVariableIndex, setSelectedVariableIndex] = useState<number>(0);
 
   useEffect(() => {
-    if (!metadata || !metadata.variables || metadata.variables.length === 0) {
+    if (!metadata || !metadata.calculation_flow) {
       setNodes([]);
       setEdges([]);
       return;
     }
 
-    const variable = metadata.variables[selectedVariableIndex];
-    if (!variable || !variable.formulas || variable.formulas.length === 0) {
-      setNodes([]);
-      setEdges([]);
-      return;
-    }
-
-    const sortedFormulas = [...variable.formulas].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-    const formula = sortedFormulas[0];
-    if (!formula || !formula.nodes || formula.nodes.length === 0) {
+    const formula = metadata.calculation_flow;
+    if (!formula.nodes || formula.nodes.length === 0) {
       setNodes([]);
       setEdges([]);
       return;
@@ -312,9 +301,9 @@ export const LogicFlow: React.FC<LogicFlowProps> = ({ metadata, resolvedTheme })
     const layoutedNodes = getLayoutedElements(rawNodes, rawEdges);
     setNodes(layoutedNodes);
     setEdges(rawEdges);
-  }, [metadata, selectedVariableIndex, resolvedTheme]);
+  }, [metadata, resolvedTheme]);
 
-  if (!metadata || !metadata.variables || metadata.variables.length === 0) {
+  if (!metadata || !metadata.calculation_flow) {
     return (
       <div className="flex items-center justify-center h-full text-slate-500 text-xs">
         ロジック定義データがありません
@@ -324,20 +313,12 @@ export const LogicFlow: React.FC<LogicFlowProps> = ({ metadata, resolvedTheme })
 
   return (
     <div className="relative w-full h-full min-h-[450px] bg-slate-950 flex flex-col">
-      {/* 変数切り替えコントロールパネル */}
+      {/* 計算目標表示パネル */}
       <div className="absolute top-4 left-4 z-10 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-4 py-2.5 rounded-xl shadow-lg flex items-center space-x-3">
-        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">表示変数:</label>
-        <select
-          value={selectedVariableIndex}
-          onChange={(e) => setSelectedVariableIndex(Number(e.target.value))}
-          className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-indigo-400 font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
-        >
-          {metadata.variables.map((v, idx) => (
-            <option key={v.name} value={idx}>
-              {v.label || v.name} ({v.name})
-            </option>
-          ))}
-        </select>
+        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">計算目標:</label>
+        <span className="text-xs text-indigo-400 font-semibold">
+          {metadata.calculation_flow.goal_variable}
+        </span>
       </div>
 
       {/* React Flow グラフレンダラー */}

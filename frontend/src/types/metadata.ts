@@ -54,6 +54,16 @@ export interface Variable {
   formulas?: FlowchartFormula[]; // Recordから配列に変更
 }
 
+export interface CalculationFlow {
+  goal_variable: string;
+  dependencies: {
+    variables: FormulaDependencyVariable[];
+    parameters: FormulaDependencyParameter[];
+  };
+  start_node: string;
+  nodes: Node[];
+}
+
 export interface ParameterValue {
   date: string;
   value: number;
@@ -80,6 +90,7 @@ export interface TestFile {
 
 export interface BackendMetadata {
   variables: Variable[];
+  calculation_flow: CalculationFlow;
   parameters: Parameter[];
   tests: TestFile[];
 }

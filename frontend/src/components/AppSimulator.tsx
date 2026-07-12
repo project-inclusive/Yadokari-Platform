@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -149,6 +149,11 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>([]);
 
+  // グラフ変更の履歴（Undo/Redo）管理用 state
+  const [undoStack, setUndoStack] = useState<FrontendMetadata[]>([]);
+  const [redoStack, setRedoStack] = useState<FrontendMetadata[]>([]);
+  const [lastSelfChangedMetadata, setLastSelfChangedMetadata] = useState<string | null>(null);
+
   useEffect(() => {
     if (!metadata || !metadata.questions || metadata.questions.length === 0 || !metadata.flow) {
       setNodes([]);
@@ -259,6 +264,49 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
     setEdges(rawEdges);
   }, [metadata, setNodes, setEdges, resolvedTheme]);
 
+  // 外部からのメタデータ更新を監視し、履歴をクリアする
+  useEffect(() => {
+    if (!metadata) return;
+    const metadataStr = JSON.stringify(metadata);
+    if (metadataStr !== lastSelfChangedMetadata) {
+      setUndoStack([]);
+      setRedoStack([]);
+      setLastSelfChangedMetadata(null);
+    }
+  }, [metadata, lastSelfChangedMetadata]);
+
+  // 元に戻す (Undo) 処理
+  const handleUndo = useCallback(() => {
+    if (undoStack.length === 0 || !metadata || !onMetadataChange) return;
+
+    const previous = undoStack[undoStack.length - 1];
+    const newUndoStack = undoStack.slice(0, -1);
+
+    setRedoStack(prev => [...prev, metadata]);
+    setUndoStack(newUndoStack);
+
+    const prevStr = JSON.stringify(previous);
+    setLastSelfChangedMetadata(prevStr);
+
+    onMetadataChange(previous);
+  }, [undoStack, metadata, onMetadataChange]);
+
+  // やり直す (Redo) 処理
+  const handleRedo = useCallback(() => {
+    if (redoStack.length === 0 || !metadata || !onMetadataChange) return;
+
+    const next = redoStack[redoStack.length - 1];
+    const newRedoStack = redoStack.slice(0, -1);
+
+    setUndoStack(prev => [...prev, metadata]);
+    setRedoStack(newRedoStack);
+
+    const nextStr = JSON.stringify(next);
+    setLastSelfChangedMetadata(nextStr);
+
+    onMetadataChange(next);
+  }, [redoStack, metadata, onMetadataChange]);
+
   // エッジの繋ぎ替えを検出した際に、親のメタデータに書き戻すロジック
   const updateMetadataTransition = useCallback((sourceId: string, oldTargetId: string, newTargetId: string) => {
     if (!metadata || !onMetadataChange) return;
@@ -286,8 +334,13 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
       }
     }
 
+    // 履歴を保存
+    setUndoStack(prev => [...prev, metadata]);
+    setRedoStack([]);
+    setLastSelfChangedMetadata(JSON.stringify(newMetadata));
+
     onMetadataChange(newMetadata);
-  }, [metadata, onMetadataChange]);
+  }, [metadata, onMetadataChange, setUndoStack, setRedoStack, setLastSelfChangedMetadata]);
 
   // エッジ再接続ハンドラ
   const onReconnect: OnReconnect = useCallback((oldEdge, newConnection) => {
@@ -310,8 +363,13 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
     // 新しい接続は固定の次遷移 (nextQuestionKey) を上書き設定する
     state.nextQuestionKey = targetVal;
 
+    // 履歴を保存
+    setUndoStack(prev => [...prev, metadata]);
+    setRedoStack([]);
+    setLastSelfChangedMetadata(JSON.stringify(newMetadata));
+
     onMetadataChange(newMetadata);
-  }, [metadata, onMetadataChange]);
+  }, [metadata, onMetadataChange, setUndoStack, setRedoStack, setLastSelfChangedMetadata]);
 
   // 新規エッジ接続ハンドラ（ドラッグして空のところからノードに新しくつなぐ場合）
   const onConnect = useCallback((connection: any) => {
@@ -343,6 +401,38 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
       <div className="absolute top-4 left-4 z-10 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg flex flex-col">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">アプリプレビュー (編集可)</span>
         <span className="text-[9px] text-slate-500 font-medium">ノードの端を結んで新規接続、または矢印をドラッグしてつなぎ替えられます</span>
+      </div>
+
+      {/* 履歴操作（Undo / Redo）ツールバー */}
+      <div className="absolute top-4 right-4 z-10 flex items-center space-x-2 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-3 py-2 rounded-xl shadow-lg">
+        <button
+          onClick={handleUndo}
+          disabled={undoStack.length === 0}
+          className={`p-2 rounded-lg border transition-all cursor-pointer flex items-center justify-center ${
+            undoStack.length > 0
+              ? 'bg-slate-850 border-slate-700 text-indigo-400 hover:bg-slate-800 hover:text-indigo-300 active:scale-95'
+              : 'bg-slate-950 border-slate-900 text-slate-600 cursor-not-allowed opacity-40'
+          }`}
+          title="元に戻す (Undo)"
+        >
+          <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+        </button>
+        <button
+          onClick={handleRedo}
+          disabled={redoStack.length === 0}
+          className={`p-2 rounded-lg border transition-all cursor-pointer flex items-center justify-center ${
+            redoStack.length > 0
+              ? 'bg-slate-850 border-slate-700 text-indigo-400 hover:bg-slate-800 hover:text-indigo-300 active:scale-95'
+              : 'bg-slate-950 border-slate-900 text-slate-600 cursor-not-allowed opacity-40'
+          }`}
+          title="やり直す (Redo)"
+        >
+          <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
+        </button>
       </div>
 
       {/* React Flow */}

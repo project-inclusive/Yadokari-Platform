@@ -8,7 +8,7 @@ const SYSTEM_PROMPT = `
 あなたは日本の社会保障・自治体独自の支援制度を定義する「OpenFisca」のバックエンド定義と、それに対応する一問一答フロントエンドGUI（マニフェスト）を同時設計するAIアシスタントです。
 
 ユーザーは新規の制度概要や既存の変更希望を提示します。あなたの使命は次の通りです：
-1. 制度の内容を正しく理解し、計算ロジック（フローチャート）を設計すること。
+1. 制度の内容を正しく理解し、計算ロジック（フローチャート）を設計すること。最終的な計算結果（支給額や可否）をゴールとして、すべての条件判定や中間代入処理が一本の有向グラフ（一連の流れ）で繋がるように \`calculation_flow\` にノードをまとめてください。
 2. その計算に必要なユーザーの入力項目（一問一答フロー）と、OpenFisca変数へのマッピングを設計すること。
 3. 自然言語での対話と解説を行い、さらに「必ず1つの \\\`\\\`\\\`json 」コードブロックを出力すること。
 
@@ -31,35 +31,33 @@ const SYSTEM_PROMPT = `
         ],
         "default_value": "デフォルト値",
         "entity": "人物" | "世帯",
-        "definition_period": "DAY" | "MONTH" | "YEAR" | "ETERNITY",
-        "formulas": [
-          {
-            "date": "2024-04-01",
-            "dependencies": {
-              "variables": [
-                { "name": "年齢", "as": "年齢", "entity": "person", "period": "current", "required": true, "default": "" }
-              ],
-              "parameters": [
-                { "path": "パラメータ：三歳未満支給額", "as": "三歳未満支給額" }
-              ]
-            },
-            "start_node": "開始ノード名",
-            "nodes": [
-              {
-                "id": "ノード名",
-                "type": "conditional" | "assignment" | "return",
-                "condition": "条件式（例: 年齢 < 15）",
-                "true_node": "真の場合の遷移先ノード名",
-                "false_node": "偽の場合の遷移先ノード名",
-                "target": "代入先変数名 (assignmentの場合のみ)",
-                "expression": "代入値や計算式、または返却値。集約関数も使用可能 (例: 合計(所得))",
-                "next_node": "代入後の遷移先ノード名 (assignmentの場合のみ)"
-              }
-            ]
-          }
-        ]
+        "definition_period": "DAY" | "MONTH" | "YEAR" | "ETERNITY"
       }
     ],
+    "calculation_flow": {
+      "goal_variable": "最終的な計算結果となる変数名（例：児童手当支給月額合計）",
+      "dependencies": {
+        "variables": [
+          { "name": "年齢", "as": "年齢", "entity": "person", "period": "current", "required": true, "default": "" }
+        ],
+        "parameters": [
+          { "path": "パラメータ：三歳未満支給額", "as": "三歳未満支給額" }
+        ]
+      },
+      "start_node": "開始ノード名",
+      "nodes": [
+        {
+          "id": "ノード名",
+          "type": "conditional" | "assignment" | "return",
+          "condition": "条件式（例: 年齢 < 15）",
+          "true_node": "真の場合の遷移先ノード名",
+          "false_node": "偽の場合の遷移先ノード名",
+          "target": "代入先変数名 (assignmentの場合のみ)",
+          "expression": "代入値や計算式、または返却値。集約関数も使用可能 (例: 合計(所得))",
+          "next_node": "代入後の遷移先ノード名 (assignmentの場合のみ)"
+        }
+      ]
+    },
     "parameters": [
       {
         "path": "仮の日本語パラメータ名",
@@ -176,76 +174,73 @@ const YADOKARI_JSON_SCHEMA_LOGIC = {
                   },
                   default_value: { type: "string" },
                   entity: { type: "string", enum: ["人物", "世帯"] },
-                  definition_period: { type: "string", enum: ["DAY", "MONTH", "YEAR", "ETERNITY"] },
-                  formulas: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        date: { type: "string" },
-                        dependencies: {
-                          type: "object",
-                          properties: {
-                            variables: {
-                              type: "array",
-                              items: {
-                                type: "object",
-                                properties: {
-                                  name: { type: "string" },
-                                  as: { type: "string" },
-                                  entity: { type: "string", enum: ["person", "household", "household_members"] },
-                                  period: { type: "string" },
-                                  required: { type: "boolean" },
-                                  default: { type: "string" }
-                                },
-                                required: ["name", "as", "entity", "period", "required", "default"],
-                                additionalProperties: false
-                              }
-                            },
-                            parameters: {
-                              type: "array",
-                              items: {
-                                type: "object",
-                                properties: {
-                                  path: { type: "string" },
-                                  as: { type: "string" }
-                                },
-                                required: ["path", "as"],
-                                additionalProperties: false
-                              }
-                            }
-                          },
-                          required: ["variables", "parameters"],
-                          additionalProperties: false
-                        },
-                        start_node: { type: "string" },
-                        nodes: {
-                          type: "array",
-                          items: {
-                            type: "object",
-                            properties: {
-                              id: { type: "string" },
-                              type: { type: "string", enum: ["conditional", "assignment", "return"] },
-                              condition: { type: "string" },
-                              true_node: { type: "string" },
-                              false_node: { type: "string" },
-                              target: { type: "string" },
-                              expression: { type: "string" },
-                              next_node: { type: "string" }
-                            },
-                            required: ["id", "type", "condition", "true_node", "false_node", "target", "expression", "next_node"],
-                            additionalProperties: false
-                          }
-                        }
-                      },
-                      required: ["date", "dependencies", "start_node", "nodes"],
-                      additionalProperties: false
-                    }
-                  }
+                  definition_period: { type: "string", enum: ["DAY", "MONTH", "YEAR", "ETERNITY"] }
                 },
-                required: ["name", "label", "documentation", "reference", "value_type", "possible_values", "default_value", "entity", "definition_period", "formulas"],
+                required: ["name", "label", "documentation", "reference", "value_type", "possible_values", "default_value", "entity", "definition_period"],
                 additionalProperties: false
               }
+            },
+            calculation_flow: {
+              type: "object",
+              properties: {
+                goal_variable: { type: "string" },
+                dependencies: {
+                  type: "object",
+                  properties: {
+                    variables: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          name: { type: "string" },
+                          as: { type: "string" },
+                          entity: { type: "string", enum: ["person", "household", "household_members"] },
+                          period: { type: "string" },
+                          required: { type: "boolean" },
+                          default: { type: "string" }
+                        },
+                        required: ["name", "as", "entity", "period", "required", "default"],
+                        additionalProperties: false
+                      }
+                    },
+                    parameters: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          path: { type: "string" },
+                          as: { type: "string" }
+                        },
+                        required: ["path", "as"],
+                        additionalProperties: false
+                      }
+                    }
+                  },
+                  required: ["variables", "parameters"],
+                  additionalProperties: false
+                },
+                start_node: { type: "string" },
+                nodes: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string" },
+                      type: { type: "string", enum: ["conditional", "assignment", "return"] },
+                      condition: { type: "string" },
+                      true_node: { type: "string" },
+                      false_node: { type: "string" },
+                      target: { type: "string" },
+                      expression: { type: "string" },
+                      next_node: { type: "string" }
+                    },
+                    required: ["id", "type", "condition", "true_node", "false_node", "target", "expression", "next_node"],
+                    additionalProperties: false
+                  }
+                }
+              },
+              required: ["goal_variable", "dependencies", "start_node", "nodes"],
+              additionalProperties: false
             },
             parameters: {
               type: "array",
@@ -298,7 +293,7 @@ const YADOKARI_JSON_SCHEMA_LOGIC = {
               }
             }
           },
-          required: ["variables", "parameters", "tests"],
+          required: ["variables", "calculation_flow", "parameters", "tests"],
           additionalProperties: false
         }
       },
@@ -425,7 +420,7 @@ const YADOKARI_JSON_SCHEMA_QUESTIONS = {
 
 function App() {
   const [projectState, setProjectState] = useState<ProjectState>({
-    projectName: '子育て特別手当アプリ',
+    projectName: '',
     chatHistory: [],
     backendMetadata: null,
     frontendMetadata: null,
@@ -462,7 +457,7 @@ function App() {
   }, [resolvedTheme, theme]);
 
   const [isGenerating, setIsGenerating] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('openai/gpt-5.4-mini');
+  const [selectedModel, setSelectedModel] = useState('z-ai/glm-5.2');
 
   // 二段階ワークフロー用状態
   const [currentPhase, setCurrentPhase] = useState<'logic' | 'questions'>('logic');
@@ -529,7 +524,26 @@ function App() {
   };
 
   const handleProjectNameChange = (name: string) => {
-    setProjectState(prev => ({ ...prev, projectName: name }));
+    setProjectState(prev => {
+      const updatedState = { ...prev, projectName: name };
+      if (updatedState.frontendMetadata) {
+        updatedState.frontendMetadata = {
+          ...updatedState.frontendMetadata,
+          app_metadata: {
+            ...updatedState.frontendMetadata.app_metadata,
+            app_title: name
+          }
+        };
+
+        const fullJsonObj: any = {};
+        if (updatedState.backendMetadata) {
+          fullJsonObj.backend = updatedState.backendMetadata;
+        }
+        fullJsonObj.frontend = updatedState.frontendMetadata;
+        updatedState.rawJsonString = JSON.stringify(fullJsonObj, null, 2);
+      }
+      return updatedState;
+    });
   };
 
   const handleClearHistory = () => {
@@ -542,7 +556,36 @@ function App() {
   };
 
   const handleImport = (importedState: ProjectState) => {
+    // 古いJSONファイル等で projectName がない場合のフォールバック
+    if (!importedState.projectName) {
+      importedState.projectName = importedState.frontendMetadata?.app_metadata?.app_title || '';
+    }
+
     setProjectState(importedState);
+
+    // 関連する派生ステートを同期する
+    const hasLogic = !!importedState.backendMetadata;
+    const hasQuestions = !!importedState.frontendMetadata;
+
+    setHasLogicData(hasLogic);
+    setHasQuestionsData(hasQuestions);
+
+    if (hasQuestions) {
+      setLogicConfirmed(true);
+      setQuestionsConfirmed(true);
+      setCurrentPhase('questions');
+      setActiveTab('preview');
+    } else if (hasLogic) {
+      setLogicConfirmed(true);
+      setQuestionsConfirmed(false);
+      setCurrentPhase('questions');
+      setActiveTab('flow');
+    } else {
+      setLogicConfirmed(false);
+      setQuestionsConfirmed(false);
+      setCurrentPhase('logic');
+      setActiveTab('flow');
+    }
   };
 
   const callLlm = async (messages: ChatMessage[], model: string): Promise<string> => {
@@ -603,6 +646,72 @@ function App() {
     return resultText;
   };
 
+  const streamLlm = async (
+    messages: ChatMessage[],
+    model: string,
+    onChunk: (text: string) => void,
+    response_format?: any
+  ): Promise<string> => {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages,
+        model,
+        response_format,
+      })
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('ReadableStream not supported on this browser.');
+    }
+
+    const decoder = new TextDecoder();
+    let accumulatedText = '';
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done && !value) break;
+
+      const chunk = decoder.decode(value || new Uint8Array(), { stream: !done });
+      buffer += chunk;
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (trimmed === 'data: [DONE]') break;
+        
+        if (trimmed.startsWith('data: ')) {
+          const jsonStr = trimmed.slice(6);
+          try {
+            const parsed = JSON.parse(jsonStr);
+            if (parsed.error) {
+              console.error('API Stream Error:', parsed.error);
+              continue;
+            }
+            const text = parsed.choices?.[0]?.delta?.content || '';
+            accumulatedText += text;
+            onChunk(text);
+          } catch (e: any) {
+            // Ignore parse errors for partial chunks
+          }
+        }
+      }
+      if (done) break;
+    }
+    return accumulatedText;
+  };
+
   const handleScrapeUrl = async (url: string): Promise<string> => {
     try {
       const response = await fetch('/api/scrape', {
@@ -628,7 +737,7 @@ ${rawContent}`;
 
       const extractedText = await callLlm([
         { role: 'user', content: extractionPrompt }
-      ], 'openai/gpt-5.4-mini');
+      ], 'z-ai/glm-5.2');
 
       if (!extractedText.trim()) {
         throw new Error('制度説明HPから有効な情報を抽出できませんでした。');
@@ -766,12 +875,6 @@ ${rawContent}`;
 ${phaseInstruction}
 `;
 
-      const messagesForApi: ChatMessage[] = [
-        systemMsg,
-        { role: 'user' as const, content: currentMetaContext },
-        ...updatedHistory.slice(0, -1)
-      ];
-
       // ユーザーの選択したモデルが JSON Mode に対応しているか判定
       const isJSONModeSupported = 
         model.includes('gpt-oss') || 
@@ -786,99 +889,191 @@ ${phaseInstruction}
 
       const activeSchema = activePhase === 'logic' ? YADOKARI_JSON_SCHEMA_LOGIC : YADOKARI_JSON_SCHEMA_QUESTIONS;
 
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: messagesForApi,
-          model: model,
-          response_format: isJSONModeSupported ? activeSchema : undefined
-        })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP error! status: ${response.status}`);
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('ReadableStream not supported on this browser.');
-      }
-
-      const decoder = new TextDecoder();
-      let aiContentAccumulator = aiInitialText;
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done && !value) break;
-
-        const chunk = decoder.decode(value || new Uint8Array(), { stream: !done });
-        buffer += chunk;
-
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          if (trimmed === 'data: [DONE]') break;
-          
-          if (trimmed.startsWith('data: ')) {
-            const jsonStr = trimmed.slice(6);
-            try {
-              const parsed = JSON.parse(jsonStr);
-              if (parsed.error) {
-                console.error('API Stream Error:', parsed.error);
-                continue;
-              }
-              const text = parsed.choices?.[0]?.delta?.content || '';
-              aiContentAccumulator += text;
-
-              setProjectState(prev => {
-                const nextHistory = [...prev.chatHistory];
-                const lastMsg = nextHistory[nextHistory.length - 1];
-                if (lastMsg && lastMsg.role === 'assistant') {
-                  lastMsg.content = aiContentAccumulator;
-                }
-                return { ...prev, chatHistory: nextHistory };
-              });
-            } catch (e: any) {
-              console.warn('Failed to parse SSE JSON chunk:', jsonStr, e);
-            }
-          }
-        }
-        if (done) break;
-      }
-
-      const parseResult = testParseMetadata(aiContentAccumulator, activePhase);
-
-      if (parseResult.success) {
+      if (activePhase === 'logic') {
+        // Step 1: Amount-related information extraction
+        // Initialize the assistant message with extraction header
         setProjectState(prev => {
-          const newBackend = parseResult.backend ? parseResult.backend : prev.backendMetadata;
-          const newFrontend = parseResult.frontend ? parseResult.frontend : prev.frontendMetadata;
-          return {
-            ...prev,
-            backendMetadata: newBackend,
-            frontendMetadata: newFrontend,
-            jsonParseError: null,
-            rawJsonString: parseResult.rawJson || null
-          };
+          const nextHistory = [...prev.chatHistory];
+          const lastMsg = nextHistory[nextHistory.length - 1];
+          if (lastMsg) lastMsg.content = '【金額に関わる情報の抽出結果】\n(抽出中...)';
+          return { ...prev, chatHistory: nextHistory };
         });
 
-        if (activePhase === 'logic') {
+        const extractionPrompt = `あなたは提供されたテキストから、給付金（支給）や貸付の「金額」に最終的に影響を与える条件や数値を抽出する専門のAIアシスタントです。
+
+以下の【対象テキスト】から、支給や貸付の**金額に最終的に関わる情報**（支給額、貸付額、加算・減算ルール、所得制限、年齢制限、その他の分岐条件など）をすべて漏れなく抽出・整理して出力してください。
+余計な解説や前置き、結びの挨拶などは一切含めず、抽出したテキストのみを簡潔に出力してください。
+
+【対象テキスト】:
+${userMessage}`;
+
+        let extractedContent = '';
+        await streamLlm(
+          [{ role: 'user', content: extractionPrompt }],
+          model,
+          (chunk) => {
+            extractedContent += chunk;
+            setProjectState(prev => {
+              const nextHistory = [...prev.chatHistory];
+              const lastMsg = nextHistory[nextHistory.length - 1];
+              if (lastMsg && lastMsg.role === 'assistant') {
+                lastMsg.content = `【金額に関わる情報の抽出結果】\n${extractedContent}`;
+              }
+              return { ...prev, chatHistory: nextHistory };
+            });
+          }
+        );
+
+        // Step 2: Calculation logic metadata generation
+        // Append separator and metadata generation header
+        setProjectState(prev => {
+          const nextHistory = [...prev.chatHistory];
+          const lastMsg = nextHistory[nextHistory.length - 1];
+          if (lastMsg) {
+            lastMsg.content = `【金額に関わる情報の抽出結果】\n${extractedContent}\n\n---\n\n【計算ロジックメタデータの生成】\n(生成中...)`;
+          }
+          return { ...prev, chatHistory: nextHistory };
+        });
+
+        const userPromptWithExtraction = `以下の元の依頼と、そこから抽出した金額に関わる重要情報に基づき、計算ロジックメタデータを生成してください。
+
+【元の依頼/コンテキスト】:
+${userMessage}
+
+【金額に関わる抽出情報】:
+${extractedContent}
+
+上記情報を満たす計算ロジックメタデータを設計し、必ず指定されたJSONスキーマに沿ったJSONを含むテキストを出力してください。`;
+
+        const messagesForApi: ChatMessage[] = [
+          systemMsg,
+          { role: 'user' as const, content: currentMetaContext },
+          ...updatedHistory.slice(0, -2), // excludes the assistant message AND the original user message
+          { role: 'user' as const, content: userPromptWithExtraction }
+        ];
+
+        let accumulatedMetadataText = '';
+        await streamLlm(
+          messagesForApi,
+          model,
+          (chunk) => {
+            accumulatedMetadataText += chunk;
+            setProjectState(prev => {
+              const nextHistory = [...prev.chatHistory];
+              const lastMsg = nextHistory[nextHistory.length - 1];
+              if (lastMsg && lastMsg.role === 'assistant') {
+                lastMsg.content = `【金額に関わる情報の抽出結果】\n${extractedContent}\n\n---\n\n【計算ロジックメタデータの生成】\n(生成中...)`;
+              }
+              return { ...prev, chatHistory: nextHistory };
+            });
+          },
+          isJSONModeSupported ? activeSchema : undefined
+        );
+
+        const parseResult = testParseMetadata(accumulatedMetadataText, 'logic');
+
+        if (parseResult.success) {
+          setProjectState(prev => {
+            const nextHistory = [...prev.chatHistory];
+            const lastMsg = nextHistory[nextHistory.length - 1];
+            if (lastMsg && lastMsg.role === 'assistant') {
+              lastMsg.content = `【金額に関わる情報の抽出結果】\n${extractedContent}\n\n---\n\n【計算ロジックメタデータの生成】\n生成が完了しました。右側の「ロジック可視化」プレビューをご確認ください。`;
+            }
+            const newBackend = parseResult.backend ? parseResult.backend : prev.backendMetadata;
+            return {
+              ...prev,
+              chatHistory: nextHistory,
+              backendMetadata: newBackend,
+              jsonParseError: null,
+              rawJsonString: parseResult.rawJson || null
+            };
+          });
           setHasLogicData(true);
         } else {
-          setHasQuestionsData(true);
-          setActiveTab('preview');
+          setProjectState(prev => {
+            const nextHistory = [...prev.chatHistory];
+            const lastMsg = nextHistory[nextHistory.length - 1];
+            if (lastMsg && lastMsg.role === 'assistant') {
+              lastMsg.content = `【金額に関わる情報の抽出結果】\n${extractedContent}\n\n---\n\n【計算ロジックメタデータの生成】\nパースエラーが発生しました。`;
+            }
+            return {
+              ...prev,
+              chatHistory: nextHistory,
+              jsonParseError: `JSONパースエラー: ${parseResult.error}`,
+              rawJsonString: parseResult.rawJson || null
+            };
+          });
         }
       } else {
-        setProjectState(prev => ({
-          ...prev,
-          jsonParseError: `JSONパースエラー: ${parseResult.error}`,
-          rawJsonString: parseResult.rawJson || null
-        }));
+        // activePhase === 'questions'
+        const messagesForApi: ChatMessage[] = [
+          systemMsg,
+          { role: 'user' as const, content: currentMetaContext },
+          ...updatedHistory.slice(0, -1)
+        ];
+
+        let accumulatedMetadataText = '';
+        await streamLlm(
+          messagesForApi,
+          model,
+          (chunk) => {
+            accumulatedMetadataText += chunk;
+            setProjectState(prev => {
+              const nextHistory = [...prev.chatHistory];
+              const lastMsg = nextHistory[nextHistory.length - 1];
+              if (lastMsg && lastMsg.role === 'assistant') {
+                lastMsg.content = accumulatedMetadataText;
+              }
+              return { ...prev, chatHistory: nextHistory };
+            });
+          },
+          isJSONModeSupported ? activeSchema : undefined
+        );
+
+        const parseResult = testParseMetadata(accumulatedMetadataText, 'questions');
+
+        if (parseResult.success) {
+          setProjectState(prev => {
+            let newFrontend = parseResult.frontend ? { ...parseResult.frontend } : (prev.frontendMetadata ? { ...prev.frontendMetadata } : null);
+            let updatedProjectName = prev.projectName;
+
+            if (newFrontend) {
+              if (prev.projectName) {
+                newFrontend.app_metadata = {
+                  ...newFrontend.app_metadata,
+                  app_title: prev.projectName
+                };
+              } else if (newFrontend.app_metadata?.app_title) {
+                updatedProjectName = newFrontend.app_metadata.app_title;
+              }
+            }
+
+            const fullJsonObj: any = {};
+            if (prev.backendMetadata) {
+              fullJsonObj.backend = prev.backendMetadata;
+            }
+            if (newFrontend) {
+              fullJsonObj.frontend = newFrontend;
+            }
+            const updatedRawJson = JSON.stringify(fullJsonObj, null, 2);
+
+            return {
+              ...prev,
+              projectName: updatedProjectName,
+              frontendMetadata: newFrontend,
+              jsonParseError: null,
+              rawJsonString: updatedRawJson
+            };
+          });
+          setHasQuestionsData(true);
+          setActiveTab('preview');
+        } else {
+          setProjectState(prev => ({
+            ...prev,
+            jsonParseError: `JSONパースエラー: ${parseResult.error}`,
+            rawJsonString: parseResult.rawJson || null
+          }));
+        }
       }
       setIsGenerating(false);
 

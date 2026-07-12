@@ -44,8 +44,13 @@ export const ImportExport: React.FC<ImportExportProps> = ({ state, onImport }) =
         const imported = JSON.parse(content) as ProjectState;
         
         // 簡易的なスキーマ検証
-        if (typeof imported.projectName !== 'string' || !Array.isArray(imported.chatHistory)) {
-          throw new Error('Invalid project file format');
+        if (!Array.isArray(imported.chatHistory)) {
+          throw new Error('Invalid project file format: chatHistory is required');
+        }
+
+        // projectName がない場合のフォールバック（型エラー防止）
+        if (typeof imported.projectName !== 'string') {
+          imported.projectName = imported.frontendMetadata?.app_metadata?.app_title || '';
         }
 
         onImport(imported);
