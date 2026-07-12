@@ -591,58 +591,92 @@ graph TD
   ],
   "flow": {
     "start_state": "見積もりモード",
-    "states": {
-      "見積もりモード": {
-        "nextQuestionKey": "寝泊まりしている地域"
+    "states": [
+      {
+        "id": "見積もりモード",
+        "nextQuestionKey": "寝泊まりしている地域",
+        "nextConditions": [],
+        "type": null,
+        "relation": null,
+        "action": null
       },
-      "寝泊まりしている地域": {
+      {
+        "id": "寝泊まりしている地域",
         "nextQuestionKey": "年齢",
         "nextConditions": [
           {
             "target": "年収",
-            "guard": { "type": "mode_check", "mode": "かんたん見積もり" }
+            "guard": {
+              "type": "mode_check",
+              "mode": "かんたん見積もり",
+              "relation": null,
+              "limit_source": null,
+              "source": null,
+              "value": null
+            }
           }
-        ]
+        ],
+        "type": null,
+        "relation": null,
+        "action": null
       },
-      "年齢": {
+      {
+        "id": "年齢",
         "nextQuestionKey": "年収",
         "nextConditions": [
           {
             "target": "changeToNextChild",
             "guard": {
               "type": "loop_check",
+              "mode": null,
               "relation": "子ども",
-              "limit_source": "子どもの人数"
+              "limit_source": "子どもの人数",
+              "source": null,
+              "value": null
             }
           }
-        ]
+        ],
+        "type": null,
+        "relation": null,
+        "action": null
       },
-      "子どもの人数": {
+      {
+        "id": "子どもの人数",
         "nextQuestionKey": "親の人数",
         "nextConditions": [
           {
             "target": "changeToChild",
             "guard": {
               "type": "has_members",
+              "mode": null,
               "relation": "子ども",
-              "source": "子どもの人数"
+              "limit_source": null,
+              "source": "子どもの人数",
+              "value": null
             }
           }
-        ]
+        ],
+        "type": null,
+        "relation": null,
+        "action": null
       },
-      "changeToChild": {
+      {
+        "id": "changeToChild",
+        "nextQuestionKey": "年齢",
+        "nextConditions": [],
         "type": "member_transition",
         "relation": "子ども",
-        "action": "start",
-        "nextQuestionKey": "年齢"
+        "action": "start"
       },
-      "changeToNextChild": {
+      {
+        "id": "changeToNextChild",
+        "nextQuestionKey": "年齢",
+        "nextConditions": [],
         "type": "member_transition",
         "relation": "子ども",
-        "action": "next",
-        "nextQuestionKey": "年齢"
+        "action": "next"
       }
-    }
+    ]
   },
   "openfisca_mapping": [
     {

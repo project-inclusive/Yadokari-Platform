@@ -169,6 +169,12 @@ const getQuestionNodeStyle = (type: string, isStart: boolean) => {
     baseStyle.borderColor = 'var(--color-emerald-400)';
     baseStyle.background = 'var(--color-emerald-950)';
     baseStyle.fontWeight = 700;
+  } else if (type === 'member_transition') {
+    baseStyle.borderColor = 'var(--color-amber-500)';
+    baseStyle.background = 'var(--color-amber-950)';
+  } else if (type === 'transition') {
+    baseStyle.borderColor = 'var(--color-slate-500)';
+    baseStyle.background = 'var(--color-slate-800)';
   }
 
   return baseStyle;
@@ -192,7 +198,7 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
 
     const rawNodes: FlowNode[] = [];
     const rawEdges: FlowEdge[] = [];
-    const startStateId = metadata.flow.start_state;
+    const startStateId = metadata.flow.start_state || (metadata.questions[0]?.id);
 
     // 1. 全質問をノードとして追加
     metadata.questions.forEach((q) => {
@@ -214,35 +220,78 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
       });
     });
 
-    // 特別な「結果判定・完了」ノードを追加
-    rawNodes.push({
-      id: 'COMPLETED_STATE',
-      type: 'question',
-      data: { label: '🏁 シミュレーション終了\n(判定結果出力)', qType: 'completed', isStart: false },
-      style: { width: 220 },
-      position: { x: 0, y: 0 },
+    // 2. 状態遷移 (Flow) の中の「メンバー遷移」や、その他のフロー定義上のノードを追加
+    const nodeIds = new Set(rawNodes.map(n => n.id));
+
+    metadata.flow.states.forEach((state) => {
+      if (state.type === 'member_transition') {
+        const actionLabel = state.action === 'start' ? 'ループ開始' : '次の世帯員へ';
+        const label = `🔄 世帯員定義: ${state.relation || ''}\n(${actionLabel})`;
+        
+        rawNodes.push({
+          id: state.id,
+          type: 'question',
+          data: { label, qType: 'member_transition', isStart: state.id === startStateId },
+          style: { width: 220 },
+          position: { x: 0, y: 0 },
+        });
+        nodeIds.add(state.id);
+      } else if (!nodeIds.has(state.id)) {
+        // それ以外のカスタム状態ノードがあれば追加
+        const label = `⚙️ 状態遷移: ${state.id}`;
+        rawNodes.push({
+          id: state.id,
+          type: 'question',
+          data: { label, qType: 'transition', isStart: state.id === startStateId },
+          style: { width: 220 },
+          position: { x: 0, y: 0 },
+        });
+        nodeIds.add(state.id);
+      }
     });
+
+    // 特別な「結果判定・完了」ノードを追加
+    if (!nodeIds.has('COMPLETED_STATE')) {
+      rawNodes.push({
+        id: 'COMPLETED_STATE',
+        type: 'question',
+        data: { label: '🏁 シミュレーション終了\n(判定結果出力)', qType: 'completed', isStart: false },
+        style: { width: 220 },
+        position: { x: 0, y: 0 },
+      });
+      nodeIds.add('COMPLETED_STATE');
+    }
 
     const isDarkMode = resolvedTheme === 'dark';
     const edgeColorNext = isDarkMode ? '#a78bfa' : '#7c3aed';
     const edgeColorCond = isDarkMode ? '#38bdf8' : '#0284c7';
     const edgeColorEnd = isDarkMode ? '#10b981' : '#059669';
 
-    // 2. 状態遷移 (Flow) からエッジを構築
+    // 接続の追跡用マップ
+    const outEdgesCount = new Map<string, number>();
+    rawNodes.forEach(n => outEdgesCount.set(n.id, 0));
+
+    const addEdgeWithTracking = (source: string, edgeObj: FlowEdge) => {
+      rawEdges.push(edgeObj);
+      outEdgesCount.set(source, (outEdgesCount.get(source) || 0) + 1);
+    };
+
+    // 3. 状態遷移 (Flow) からエッジを構築
     metadata.flow.states.forEach((state) => {
-      // 固定の次遷移
+      // A. 固定の次遷移
       if (state.nextQuestionKey) {
-        rawEdges.push({
-          id: `${state.id}-${state.nextQuestionKey}-next`,
+        const targetId = nodeIds.has(state.nextQuestionKey) ? state.nextQuestionKey : 'COMPLETED_STATE';
+        addEdgeWithTracking(state.id, {
+          id: `${state.id}-${targetId}-next`,
           source: state.id,
-          target: state.nextQuestionKey,
+          target: targetId,
           reconnectable: true,
           style: { stroke: edgeColorNext, strokeWidth: 2 },
           markerEnd: { type: MarkerType.ArrowClosed, color: edgeColorNext, width: 20, height: 20 },
         });
       }
 
-      // 条件付き遷移
+      // B. 条件付き遷移
       if (state.nextConditions && state.nextConditions.length > 0) {
         state.nextConditions.forEach((cond, idx) => {
           let label = '';
@@ -253,15 +302,15 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
               label = `ループ完了`;
             } else if (cond.guard.type === 'has_members') {
               label = `${cond.guard.relation || ''}あり`;
+            } else if (cond.guard.type === 'value_check') {
+              label = `値: ${cond.guard.value || ''}`;
             } else {
               label = cond.guard.type;
             }
           }
 
-          const isTargetQuestion = metadata.questions.some(q => q.id === cond.target);
-          const targetId = isTargetQuestion ? cond.target : 'COMPLETED_STATE';
-
-          rawEdges.push({
+          const targetId = nodeIds.has(cond.target) ? cond.target : 'COMPLETED_STATE';
+          addEdgeWithTracking(state.id, {
             id: `${state.id}-${targetId}-${idx}`,
             source: state.id,
             target: targetId,
@@ -273,13 +322,16 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
           });
         });
       }
+    });
 
-      // 遷移先も固定次遷移もなく、終了条件もないノードは、完了状態に繋ぐ
-      const hasNext = state.nextQuestionKey || (state.nextConditions && state.nextConditions.length > 0);
-      if (!hasNext) {
-        rawEdges.push({
-          id: `${state.id}-COMPLETED_STATE-end`,
-          source: state.id,
+    // 4. 遷移先も条件遷移もないノードは、完了状態に繋ぐ
+    rawNodes.forEach((node) => {
+      if (node.id === 'COMPLETED_STATE') return;
+      const count = outEdgesCount.get(node.id) || 0;
+      if (count === 0) {
+        addEdgeWithTracking(node.id, {
+          id: `${node.id}-COMPLETED_STATE-end`,
+          source: node.id,
           target: 'COMPLETED_STATE',
           reconnectable: true,
           style: { stroke: edgeColorEnd, strokeWidth: 2 },
@@ -287,6 +339,72 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
         });
       }
     });
+
+    // 5. 孤立ノードを自動修復して接続する (BFS到達性チェックと修復)
+    let repaired = true;
+    while (repaired) {
+      repaired = false;
+
+      // 現在のエッジ状況を基に、開始状態からの到達性をチェック
+      const reachable = new Set<string>();
+      const queue = [startStateId];
+      reachable.add(startStateId);
+
+      const forwardAdj = new Map<string, Set<string>>();
+      rawNodes.forEach(node => forwardAdj.set(node.id, new Set()));
+      rawEdges.forEach(edge => {
+        forwardAdj.get(edge.source)?.add(edge.target);
+      });
+
+      let head = 0;
+      while (head < queue.length) {
+        const u = queue[head++];
+        const neighbors = forwardAdj.get(u);
+        if (neighbors) {
+          for (const v of neighbors) {
+            if (!reachable.has(v)) {
+              reachable.add(v);
+              queue.push(v);
+            }
+          }
+        }
+      }
+
+      // 到達不能なノードを探す
+      for (const node of rawNodes) {
+        if (node.id === 'COMPLETED_STATE') continue;
+        if (!reachable.has(node.id)) {
+          // 修復対象：このノードへエッジを張る
+          let sourceId = startStateId;
+
+          const qIdx = metadata.questions.findIndex(q => q.id === node.id);
+          if (qIdx > 0) {
+            // 定義順で1つ前の質問から繋ぐ
+            sourceId = metadata.questions[qIdx - 1].id;
+          } else if (qIdx === 0) {
+            sourceId = startStateId;
+          } else {
+            // 質問ではない（メンバー遷移などの）孤立ノードは、最終質問から繋ぐ
+            if (metadata.questions.length > 0) {
+              sourceId = metadata.questions[metadata.questions.length - 1].id;
+            }
+          }
+
+          // デフォルトのエッジを追加して到達可能にする
+          addEdgeWithTracking(sourceId, {
+            id: `${sourceId}-${node.id}-fallback-repair`,
+            source: sourceId,
+            target: node.id,
+            reconnectable: true,
+            style: { stroke: edgeColorNext, strokeWidth: 1.5, strokeDasharray: '2 2' },
+            markerEnd: { type: MarkerType.ArrowClosed, color: edgeColorNext, width: 15, height: 15 },
+          });
+
+          repaired = true;
+          break; // BFSとチェックを再実行するためにループを抜ける
+        }
+      }
+    }
 
     const layoutedNodes = getLayoutedElements(rawNodes, rawEdges);
     setNodes(layoutedNodes);
@@ -342,8 +460,18 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
 
     // ディープコピーの作成
     const newMetadata = JSON.parse(JSON.stringify(metadata)) as FrontendMetadata;
-    const state = newMetadata.flow.states.find(s => s.id === sourceId);
-    if (!state) return;
+    let state = newMetadata.flow.states.find(s => s.id === sourceId);
+    if (!state) {
+      state = {
+        id: sourceId,
+        nextQuestionKey: null,
+        nextConditions: [],
+        type: null,
+        relation: null,
+        action: null
+      };
+      newMetadata.flow.states.push(state);
+    }
 
     const targetVal = newTargetId === 'COMPLETED_STATE' ? '' : newTargetId;
 
@@ -384,8 +512,18 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
     if (!metadata || !onMetadataChange) return;
 
     const newMetadata = JSON.parse(JSON.stringify(metadata)) as FrontendMetadata;
-    const state = newMetadata.flow.states.find(s => s.id === sourceId);
-    if (!state) return;
+    let state = newMetadata.flow.states.find(s => s.id === sourceId);
+    if (!state) {
+      state = {
+        id: sourceId,
+        nextQuestionKey: null,
+        nextConditions: [],
+        type: null,
+        relation: null,
+        action: null
+      };
+      newMetadata.flow.states.push(state);
+    }
 
     const targetVal = newTargetId === 'COMPLETED_STATE' ? '' : newTargetId;
     
@@ -428,7 +566,7 @@ export const AppSimulator: React.FC<AppSimulatorProps> = ({ metadata, onMetadata
     <div className="relative w-full h-full min-h-[450px] bg-slate-950 flex flex-col">
       {/* 情報ラベル */}
       <div className="absolute top-4 left-4 z-10 bg-slate-900/90 border border-slate-800 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg flex flex-col">
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">アプリプレビュー (編集可)</span>
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">一問一答フロー (編集可)</span>
         <span className="text-[9px] text-slate-500 font-medium">ノードの端を結んで新規接続、または矢印をドラッグしてつなぎ替えられます</span>
       </div>
 

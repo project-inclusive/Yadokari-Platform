@@ -53,7 +53,7 @@ export const PreviewArea: React.FC<PreviewAreaProps> = ({
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            アプリプレビュー
+            一問一答フロー
             {activeTab === 'preview' && (
               <span className="absolute bottom-0 inset-x-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full" />
             )}

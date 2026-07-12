@@ -114,11 +114,12 @@ export interface Question {
 }
 
 export interface Guard {
-  type: 'mode_check' | 'loop_check' | 'has_members';
-  mode?: string;
-  relation?: string;
-  limit_source?: string;
-  source?: string;
+  type: 'mode_check' | 'loop_check' | 'has_members' | 'value_check';
+  mode?: string | null;
+  relation?: string | null;
+  limit_source?: string | null;
+  source?: string | null;
+  value?: string | null;
 }
 
 export interface NextCondition {
@@ -130,9 +131,9 @@ export interface FlowState {
   id: string; // strictモード適合のためキー名からプロパティへ移行
   nextQuestionKey?: string | null;
   nextConditions?: NextCondition[];
-  type?: 'member_transition';
-  relation?: string;
-  action?: 'start' | 'next';
+  type?: 'member_transition' | null;
+  relation?: string | null;
+  action?: 'start' | 'next' | null;
 }
 
 export interface Flow {

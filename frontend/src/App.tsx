@@ -9,7 +9,7 @@ const SYSTEM_PROMPT = `
 
 ユーザーは新規の制度概要や既存の変更希望を提示します。あなたの使命は次の通りです：
 1. 制度の内容を正しく理解し、計算ロジック（フローチャート）を設計すること。最終的な計算結果（支給額や可否）をゴールとして、すべての条件判定や中間代入処理が一本の有向グラフ（一連の流れ）で繋がるように \`calculation_flow\` にノードをまとめてください。
-2. その計算に必要なユーザーの入力項目（一問一答フロー）と、OpenFisca変数へのマッピングを設計すること。
+2. その計算に必要なユーザーの入力項目（一問一答フロー）と、OpenFisca変数へのマッピングを設計すること。この際、すべての質問 (\`questions\`) が必ず \`flow.states\` に遷移定義として含まれ、開始状態 (\`start_state\`) から終端（値が \`null\` の遷移など）まで有向グラフとして完全に接続されるように設計してください。通常の質問ノードは \`type\`, \`relation\`, \`action\` を \`null\` とし、選択肢ごとの分岐は \`guard.type\` を \`"value_check"\` とし、\`guard.value\` に判定対象の選択肢文字列を指定してください（他の条件フィールドは \`null\` を指定）。
 3. 自然言語での対話と解説を行い、さらに「必ず1つの \\\`\\\`\\\`json 」コードブロックを出力すること。
 
 ### JSON出力スキーマ
@@ -108,17 +108,18 @@ const SYSTEM_PROMPT = `
             {
               "target": "遷移先質問IDまたはループアクション名",
               "guard": {
-                "type": "mode_check" | "loop_check" | "has_members",
-                "mode": "かんたん見積もり",
-                "relation": "子ども",
-                "limit_source": "子どもの人数",
-                "source": "子どもの人数"
+                "type": "mode_check" | "loop_check" | "has_members" | "value_check",
+                "mode": "かんたん見積もり" | null,
+                "relation": "子ども" | null,
+                "limit_source": "子どもの人数" | null,
+                "source": "子どもの人数" | null,
+                "value": "選択肢の値" | null
               }
             }
           ],
-          "type": "member_transition",
-          "relation": "子ども",
-          "action": "start"
+          "type": "member_transition" | null,
+          "relation": "子ども" | null,
+          "action": "start" | "next" | null
         }
       ]
     },
@@ -365,13 +366,14 @@ const YADOKARI_JSON_SCHEMA_QUESTIONS = {
                             guard: {
                               type: "object",
                               properties: {
-                                type: { type: "string", enum: ["mode_check", "loop_check", "has_members"] },
-                                mode: { type: "string" },
-                                relation: { type: "string" },
-                                limit_source: { type: "string" },
-                                source: { type: "string" }
+                                type: { type: "string", enum: ["mode_check", "loop_check", "has_members", "value_check"] },
+                                mode: { type: ["string", "null"] },
+                                relation: { type: ["string", "null"] },
+                                limit_source: { type: ["string", "null"] },
+                                source: { type: ["string", "null"] },
+                                value: { type: ["string", "null"] }
                               },
-                              required: ["type", "mode", "relation", "limit_source", "source"],
+                              required: ["type", "mode", "relation", "limit_source", "source", "value"],
                               additionalProperties: false
                             }
                           },
@@ -379,9 +381,9 @@ const YADOKARI_JSON_SCHEMA_QUESTIONS = {
                           additionalProperties: false
                         }
                       },
-                      type: { type: "string", enum: ["member_transition"] },
-                      relation: { type: "string" },
-                      action: { type: "string", enum: ["start", "next"] }
+                      type: { type: ["string", "null"], enum: ["member_transition", null] },
+                      relation: { type: ["string", "null"] },
+                      action: { type: ["string", "null"], enum: ["start", "next", null] }
                     },
                     required: ["id", "nextQuestionKey", "nextConditions", "type", "relation", "action"],
                     additionalProperties: false
