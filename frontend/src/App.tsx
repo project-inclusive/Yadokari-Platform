@@ -953,31 +953,86 @@ ${extractedContent}
         ];
 
         let accumulatedMetadataText = '';
-        await streamLlm(
-          messagesForApi,
-          model,
-          (chunk) => {
-            accumulatedMetadataText += chunk;
-            setProjectState(prev => {
-              const nextHistory = [...prev.chatHistory];
-              const lastMsg = nextHistory[nextHistory.length - 1];
-              if (lastMsg && lastMsg.role === 'assistant') {
-                lastMsg.content = `【金額に関わる情報の抽出結果】\n${extractedContent}\n\n---\n\n【計算ロジックメタデータの生成】\n(生成中...)`;
-              }
-              return { ...prev, chatHistory: nextHistory };
-            });
-          },
-          isJSONModeSupported ? activeSchema : undefined
-        );
+        let fallbackTriggered = false;
 
-        const parseResult = testParseMetadata(accumulatedMetadataText, 'logic');
+        try {
+          await streamLlm(
+            messagesForApi,
+            model,
+            (chunk) => {
+              accumulatedMetadataText += chunk;
+              setProjectState(prev => {
+                const nextHistory = [...prev.chatHistory];
+                const lastMsg = nextHistory[nextHistory.length - 1];
+                if (lastMsg && lastMsg.role === 'assistant') {
+                  lastMsg.content = `【金額に関わる情報の抽出結果】\n${extractedContent}\n\n---\n\n【計算ロジックメタデータの生成】\n(生成中...)`;
+                }
+                return { ...prev, chatHistory: nextHistory };
+              });
+            },
+            isJSONModeSupported ? activeSchema : undefined
+          );
+        } catch (streamError: any) {
+          console.error("Stream error in logic phase metadata generation:", streamError);
+          if (model === 'z-ai/glm-5.2') {
+            fallbackTriggered = true;
+          } else {
+            throw streamError;
+          }
+        }
+
+        let parseResult = !fallbackTriggered
+          ? testParseMetadata(accumulatedMetadataText, 'logic')
+          : { success: false, error: 'Stream interrupted or timed out' };
+
+        if (!parseResult.success && model === 'z-ai/glm-5.2') {
+          fallbackTriggered = true;
+        }
+
+        if (fallbackTriggered) {
+          console.log("GLM-5.2 generation failed or interrupted. Falling back to Gemini 3.5 Flash...");
+          
+          setProjectState(prev => {
+            const nextHistory = [...prev.chatHistory];
+            const lastMsg = nextHistory[nextHistory.length - 1];
+            if (lastMsg) {
+              lastMsg.content = `【金額に関わる情報の抽出結果】\n${extractedContent}\n\n---\n\n【計算ロジックメタデータの生成】\n⚠️ GLM 5.2での生成中にタイムアウトまたは切断が発生したため、自動的に高速な Gemini 3.5 Flash へフォールバックして再生成を試みています...\n\n(再生成中...)`;
+            }
+            return { ...prev, chatHistory: nextHistory };
+          });
+
+          const fallbackModel = 'google/gemini-3.5-flash';
+          accumulatedMetadataText = '';
+          try {
+            await streamLlm(
+              messagesForApi,
+              fallbackModel,
+              (chunk) => {
+                accumulatedMetadataText += chunk;
+                setProjectState(prev => {
+                  const nextHistory = [...prev.chatHistory];
+                  const lastMsg = nextHistory[nextHistory.length - 1];
+                  if (lastMsg && lastMsg.role === 'assistant') {
+                    lastMsg.content = `【金額に関わる情報の抽出結果】\n${extractedContent}\n\n---\n\n【計算ロジックメタデータの生成】\n⚠️ GLM 5.2での生成中にタイムアウトまたは切断が発生したため、自動的に高速な Gemini 3.5 Flash へフォールバックして再生成を試みています...\n\n(Gemini 3.5 Flash で生成中...)`;
+                  }
+                  return { ...prev, chatHistory: nextHistory };
+                });
+              },
+              activeSchema
+            );
+            parseResult = testParseMetadata(accumulatedMetadataText, 'logic');
+          } catch (fallbackError: any) {
+            console.error("Fallback generation failed in logic phase:", fallbackError);
+            parseResult = { success: false, error: `フォールバック先（Gemini 3.5 Flash）でのエラー: ${fallbackError.message}` };
+          }
+        }
 
         if (parseResult.success) {
           setProjectState(prev => {
             const nextHistory = [...prev.chatHistory];
             const lastMsg = nextHistory[nextHistory.length - 1];
             if (lastMsg && lastMsg.role === 'assistant') {
-              lastMsg.content = `【金額に関わる情報の抽出結果】\n${extractedContent}\n\n---\n\n【計算ロジックメタデータの生成】\n生成が完了しました。右側の「ロジック可視化」プレビューをご確認ください。`;
+              lastMsg.content = `【金額に関わる情報の抽出結果】\n${extractedContent}\n\n---\n\n【計算ロジックメタデータの生成】\n${fallbackTriggered ? '⚠️ GLM 5.2のタイムアウトのためGemini 3.5 Flashに切り替えて再生成しました。\n\n' : ''}生成が完了しました。右側の「ロジック可視化」プレビューをご確認ください。`;
             }
             const newBackend = parseResult.backend ? parseResult.backend : prev.backendMetadata;
             return {
@@ -1013,27 +1068,88 @@ ${extractedContent}
         ];
 
         let accumulatedMetadataText = '';
-        await streamLlm(
-          messagesForApi,
-          model,
-          (chunk) => {
-            accumulatedMetadataText += chunk;
-            setProjectState(prev => {
-              const nextHistory = [...prev.chatHistory];
-              const lastMsg = nextHistory[nextHistory.length - 1];
-              if (lastMsg && lastMsg.role === 'assistant') {
-                lastMsg.content = accumulatedMetadataText;
-              }
-              return { ...prev, chatHistory: nextHistory };
-            });
-          },
-          isJSONModeSupported ? activeSchema : undefined
-        );
+        let fallbackTriggered = false;
 
-        const parseResult = testParseMetadata(accumulatedMetadataText, 'questions');
+        try {
+          await streamLlm(
+            messagesForApi,
+            model,
+            (chunk) => {
+              accumulatedMetadataText += chunk;
+              setProjectState(prev => {
+                const nextHistory = [...prev.chatHistory];
+                const lastMsg = nextHistory[nextHistory.length - 1];
+                if (lastMsg && lastMsg.role === 'assistant') {
+                  lastMsg.content = accumulatedMetadataText;
+                }
+                return { ...prev, chatHistory: nextHistory };
+              });
+            },
+            isJSONModeSupported ? activeSchema : undefined
+          );
+        } catch (streamError: any) {
+          console.error("Stream error in questions phase metadata generation:", streamError);
+          if (model === 'z-ai/glm-5.2') {
+            fallbackTriggered = true;
+          } else {
+            throw streamError;
+          }
+        }
+
+        let parseResult = !fallbackTriggered
+          ? testParseMetadata(accumulatedMetadataText, 'questions')
+          : { success: false, error: 'Stream interrupted or timed out' };
+
+        if (!parseResult.success && model === 'z-ai/glm-5.2') {
+          fallbackTriggered = true;
+        }
+
+        if (fallbackTriggered) {
+          console.log("GLM-5.2 generation failed or interrupted in questions phase. Falling back to Gemini 3.5 Flash...");
+
+          setProjectState(prev => {
+            const nextHistory = [...prev.chatHistory];
+            const lastMsg = nextHistory[nextHistory.length - 1];
+            if (lastMsg) {
+              lastMsg.content = `⚠️ GLM 5.2での質問定義生成中にタイムアウトまたは切断が発生したため、自動的に高速な Gemini 3.5 Flash へフォールバックして再生成を試みています...\n\n(再生成中...)`;
+            }
+            return { ...prev, chatHistory: nextHistory };
+          });
+
+          const fallbackModel = 'google/gemini-3.5-flash';
+          accumulatedMetadataText = '';
+          try {
+            await streamLlm(
+              messagesForApi,
+              fallbackModel,
+              (chunk) => {
+                accumulatedMetadataText += chunk;
+                setProjectState(prev => {
+                  const nextHistory = [...prev.chatHistory];
+                  const lastMsg = nextHistory[nextHistory.length - 1];
+                  if (lastMsg && lastMsg.role === 'assistant') {
+                    lastMsg.content = `⚠️ GLM 5.2での質問定義生成中にタイムアウトまたは切断が発生したため、自動的に高速な Gemini 3.5 Flash へフォールバックして再生成を試みています...\n\n(Gemini 3.5 Flash で生成中...)\n\n${accumulatedMetadataText}`;
+                  }
+                  return { ...prev, chatHistory: nextHistory };
+                });
+              },
+              activeSchema
+            );
+            parseResult = testParseMetadata(accumulatedMetadataText, 'questions');
+          } catch (fallbackError: any) {
+            console.error("Fallback generation failed in questions phase:", fallbackError);
+            parseResult = { success: false, error: `フォールバック先（Gemini 3.5 Flash）でのエラー: ${fallbackError.message}` };
+          }
+        }
 
         if (parseResult.success) {
           setProjectState(prev => {
+            const nextHistory = [...prev.chatHistory];
+            const lastMsg = nextHistory[nextHistory.length - 1];
+            if (lastMsg && lastMsg.role === 'assistant') {
+              lastMsg.content = `${fallbackTriggered ? '⚠️ GLM 5.2のタイムアウトのためGemini 3.5 Flashに切り替えて再生成しました。\n\n' : ''}${accumulatedMetadataText}`;
+            }
+
             let newFrontend = parseResult.frontend ? { ...parseResult.frontend } : (prev.frontendMetadata ? { ...prev.frontendMetadata } : null);
             let updatedProjectName = prev.projectName;
 
@@ -1059,6 +1175,7 @@ ${extractedContent}
 
             return {
               ...prev,
+              chatHistory: nextHistory,
               projectName: updatedProjectName,
               frontendMetadata: newFrontend,
               jsonParseError: null,
@@ -1068,11 +1185,19 @@ ${extractedContent}
           setHasQuestionsData(true);
           setActiveTab('preview');
         } else {
-          setProjectState(prev => ({
-            ...prev,
-            jsonParseError: `JSONパースエラー: ${parseResult.error}`,
-            rawJsonString: parseResult.rawJson || null
-          }));
+          setProjectState(prev => {
+            const nextHistory = [...prev.chatHistory];
+            const lastMsg = nextHistory[nextHistory.length - 1];
+            if (lastMsg && lastMsg.role === 'assistant' && fallbackTriggered) {
+              lastMsg.content = `⚠️ GLM 5.2のタイムアウトのためGemini 3.5 Flashにフォールバックしましたが、パースエラーが発生しました。\n\n${accumulatedMetadataText}`;
+            }
+            return {
+              ...prev,
+              chatHistory: nextHistory,
+              jsonParseError: `JSONパースエラー: ${parseResult.error}`,
+              rawJsonString: parseResult.rawJson || null
+            };
+          });
         }
       }
       setIsGenerating(false);

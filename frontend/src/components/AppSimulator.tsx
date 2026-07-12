@@ -78,17 +78,46 @@ const nodeTypes = {
   question: QuestionNode,
 };
 
+const estimateNodeHeight = (label: string): number => {
+  if (!label) return 60;
+  const lines = label.split('\n');
+  let totalLines = 0;
+  for (const line of lines) {
+    let lineLength = 0;
+    for (let i = 0; i < line.length; i++) {
+      const code = line.charCodeAt(i);
+      if (code >= 0x00 && code <= 0x7f) {
+        lineLength += 0.5; // 半角文字
+      } else {
+        lineLength += 1.0; // 全角文字
+      }
+    }
+    // 幅220px (実質描画幅188px) に対して、フォントサイズ11pxなので1行約17文字
+    const wrappedLines = Math.max(1, Math.ceil(lineLength / 17));
+    totalLines += wrappedLines;
+  }
+  // padding (32px) + border (4px) = 36px
+  // 1行の高さ 16.5px (fontSize 11px * lineHeight 1.5)
+  // バッファとして + 12px
+  return 36 + (totalLines * 16.5) + 12;
+};
+
 // dagre 自動レイアウト関数
 const getLayoutedElements = (nodes: FlowNode[], edges: FlowEdge[], direction = 'TB') => {
   const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: direction });
+  g.setGraph({ rankdir: direction, ranksep: 60, nodesep: 40 });
   g.setDefaultEdgeLabel(() => ({}));
 
   const nodeWidth = 240;
-  const nodeHeight = 100;
 
-  nodes.forEach((node) => {
-    g.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  const nodesWithHeight = nodes.map((node) => {
+    const label = (node.data?.label as string) || '';
+    const height = estimateNodeHeight(label);
+    return { ...node, height };
+  });
+
+  nodesWithHeight.forEach((node) => {
+    g.setNode(node.id, { width: nodeWidth, height: node.height });
   });
 
   edges.forEach((edge) => {
@@ -97,13 +126,13 @@ const getLayoutedElements = (nodes: FlowNode[], edges: FlowEdge[], direction = '
 
   dagre.layout(g);
 
-  return nodes.map((node) => {
+  return nodesWithHeight.map((node) => {
     const nodeWithPosition = g.node(node.id);
     return {
       ...node,
       position: {
         x: nodeWithPosition.x - nodeWidth / 2,
-        y: nodeWithPosition.y - nodeHeight / 2,
+        y: nodeWithPosition.y - node.height / 2,
       },
     };
   });
