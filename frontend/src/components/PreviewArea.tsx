@@ -27,11 +27,12 @@ export const PreviewArea: React.FC<PreviewAreaProps> = ({
   const hasData = backendMetadata || frontendMetadata || !!rawJsonString;
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+    <div id="preview-area" className="flex flex-col h-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
       {/* タブヘッダー */}
-      <div className="px-5 bg-slate-900/60 border-b border-slate-800 backdrop-blur-md flex items-center justify-between shrink-0">
+      <div id="preview-tab-header" className="px-5 bg-slate-900/60 border-b border-slate-800 backdrop-blur-md flex items-center justify-between shrink-0">
         <div className="flex space-x-6">
           <button
+            id="tab-btn-flow"
             onClick={() => setActiveTab('flow')}
             className={`py-3.5 text-xs font-semibold border-b-2 transition-all relative ${
               activeTab === 'flow'
@@ -46,6 +47,7 @@ export const PreviewArea: React.FC<PreviewAreaProps> = ({
           </button>
 
           <button
+            id="tab-btn-preview"
             onClick={() => setActiveTab('preview')}
             className={`py-3.5 text-xs font-semibold border-b-2 transition-all relative ${
               activeTab === 'preview'
@@ -60,6 +62,7 @@ export const PreviewArea: React.FC<PreviewAreaProps> = ({
           </button>
 
           <button
+            id="tab-btn-json"
             onClick={() => setActiveTab('json')}
             className={`py-3.5 text-xs font-semibold border-b-2 transition-all relative ${
               activeTab === 'json'
@@ -96,7 +99,7 @@ export const PreviewArea: React.FC<PreviewAreaProps> = ({
       )}
 
       {/* コンテンツ領域 */}
-      <div className={`flex-1 ${activeTab === 'flow' || activeTab === 'preview' ? 'overflow-hidden' : 'p-5 overflow-y-auto'} bg-slate-900/30`}>
+      <div id="preview-content-area" className={`flex-1 ${activeTab === 'flow' || activeTab === 'preview' ? 'overflow-hidden' : 'p-5 overflow-y-auto'} bg-slate-900/30`}>
         {!hasData ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-500 text-xs py-24 text-center">
             <svg className="w-12 h-12 mb-3 stroke-current text-slate-600" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

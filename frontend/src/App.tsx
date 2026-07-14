@@ -3,6 +3,8 @@ import type { ProjectState, ChatMessage, BackendMetadata, FrontendMetadata } fro
 import { ChatConsole } from './components/ChatConsole';
 import { PreviewArea } from './components/PreviewArea';
 import { ImportExport } from './components/ImportExport';
+import { driver } from 'driver.js';
+import 'driver.js/dist/driver.css';
 
 const SYSTEM_PROMPT = `
 あなたは日本の社会保障・自治体独自の支援制度を定義する「OpenFisca」のバックエンド定義と、それに対応する一問一答フロントエンドGUI（マニフェスト）を同時設計するAIアシスタントです。
@@ -470,6 +472,108 @@ function App() {
   
   // 右ペインのタブ制御
   const [activeTab, setActiveTab] = useState<'flow' | 'preview' | 'json'>('flow');
+
+  const runOnboardingTour = (force = false) => {
+    const isTourCompleted = localStorage.getItem('yadokari_tour_completed');
+    if (isTourCompleted && !force) return;
+
+    // A small delay to ensure DOM is fully rendered
+    setTimeout(() => {
+      const driverObj = driver({
+        popoverClass: 'driverjs-theme',
+        showProgress: true,
+        animate: true,
+        allowClose: true,
+        overlayColor: resolvedTheme === 'dark' ? 'rgba(7, 10, 19, 0.75)' : 'rgba(15, 23, 42, 0.65)',
+        nextBtnText: '次へ',
+        prevBtnText: '前へ',
+        doneBtnText: '完了',
+        steps: [
+          {
+            element: '#project-name-input',
+            popover: {
+              title: '🏷️ 制度名の入力',
+              description: 'これから設計する制度の名前（例：「子育て特別手当」「住宅助成金」など）を入力します。',
+              side: 'bottom',
+              align: 'start'
+            }
+          },
+          {
+            element: '#chat-console',
+            popover: {
+              title: '💬 AI対話コンソール',
+              description: '自治体の各種支援制度や、オリジナルの給付金ルールをAIとチャットしながら定義するエリアです。',
+              side: 'right',
+              align: 'start'
+            }
+          },
+          {
+            element: '#chat-input-form',
+            popover: {
+              title: '📝 制度の指示入力',
+              description: '「年収960万円未満なら月額1万円を支給する手当を作って」のように自然言語で指示を入力し、送信します。',
+              side: 'top',
+              align: 'center'
+            }
+          },
+          {
+            element: '#url-scraper-bar',
+            popover: {
+              title: '🔗 制度URLの読み込み',
+              description: '制度説明が掲載されている自治体公式ページなどのURLをここに入力すると、AIが内容を直接読み取ってロジックを設計します。',
+              side: 'top',
+              align: 'center'
+            }
+          },
+          {
+            element: '#workflow-phase-panel',
+            popover: {
+              title: '⚡ 2段階の進行フェーズ',
+              description: '「1. 計算ロジック」と「2. ユーザーへの質問」のフェーズ順で進行します。現在の状態を確認し、「確定」や「修正」ができます。',
+              side: 'bottom',
+              align: 'center'
+            }
+          },
+          {
+            element: '#preview-area',
+            popover: {
+              title: '👁️ プレビュー＆シミュレータ',
+              description: 'AIが設計した定義データ（JSON）をもとに、ロジックのフローチャートや、動作可能な一問一答画面がここにリアルタイムで表示されます。',
+              side: 'left',
+              align: 'start'
+            }
+          },
+          {
+            element: '#preview-tab-header',
+            popover: {
+              title: '🗂️ プレビュータブの切り替え',
+              description: '「ロジック可視化（有向グラフ）」「一問一答フロー（アプリシミュレーター）」「定義データ(JSON)」の3つの表示を切り替えます。',
+              side: 'bottom',
+              align: 'center'
+            }
+          },
+          {
+            element: '#help-button',
+            popover: {
+              title: '❓ ガイドの再表示',
+              description: 'この操作ガイドは、ヘッダーの「ヘルプ」ボタンからいつでも再表示できます。',
+              side: 'bottom',
+              align: 'end'
+            }
+          }
+        ],
+        onDestroyed: () => {
+          localStorage.setItem('yadokari_tour_completed', 'true');
+        }
+      });
+
+      driverObj.drive();
+    }, 150);
+  };
+
+  useEffect(() => {
+    runOnboardingTour();
+  }, []);
 
   const handleConfirmLogic = () => {
     setLogicConfirmed(true);
@@ -1297,6 +1401,18 @@ ${extractedContent}
               自動
             </button>
           </div>
+
+          <button
+            id="help-button"
+            onClick={() => runOnboardingTour(true)}
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-850 rounded-lg text-[11px] font-semibold text-slate-300 hover:text-indigo-400 transition-all cursor-pointer shadow-sm"
+            title="操作ガイドを表示"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+            </svg>
+            <span>ヘルプ</span>
+          </button>
 
           <ImportExport state={projectState} onImport={handleImport} />
         </div>

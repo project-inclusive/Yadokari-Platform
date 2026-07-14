@@ -147,10 +147,10 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+    <div id="chat-console" className="flex flex-col h-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
       {/* ヘッダーエリア */}
       <div className="px-5 py-4 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md flex items-center justify-between shrink-0">
-        <div className="flex-1 min-w-0 mr-3">
+        <div id="project-name-input" className="flex-1 min-w-0 mr-3">
           <input
             type="text"
             value={projectName}
@@ -163,7 +163,9 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
 
         <div className="flex items-center space-x-2">
           {/* モデル選択 */}
+          <label htmlFor="model-selector" className="text-xs text-slate-400 font-medium whitespace-nowrap">AIモデル</label>
           <select
+            id="model-selector"
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
             className="bg-slate-800 text-slate-300 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -192,7 +194,7 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
       </div>
 
       {/* ワークフローフェーズパネル */}
-      <div className="p-4 bg-slate-950/40 border-b border-slate-800 flex flex-col space-y-3 shrink-0">
+      <div id="workflow-phase-panel" className="p-4 bg-slate-950/40 border-b border-slate-800 flex flex-col space-y-3 shrink-0">
         <div className="flex justify-between items-center">
           <span className="text-[10px] font-bold text-slate-500 tracking-wider">フェーズ進捗</span>
         </div>
@@ -349,7 +351,7 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
       </div>
 
       {/* URLスクレイパーバー */}
-      <div className="px-5 py-2.5 bg-slate-950 border-t border-slate-900 flex flex-col space-y-1.5 shrink-0">
+      <div id="url-scraper-bar" className="px-5 py-2.5 bg-slate-950 border-t border-slate-900 flex flex-col space-y-1.5 shrink-0">
         <div className="flex items-start space-x-2">
           <textarea
             value={urlInput}
@@ -388,7 +390,7 @@ export const ChatConsole: React.FC<ChatConsoleProps> = ({
       </div>
 
       {/* 入力フォーム */}
-      <form onSubmit={handleSubmit} className="p-4 bg-slate-950 border-t border-slate-900 shrink-0">
+      <form id="chat-input-form" onSubmit={handleSubmit} className="p-4 bg-slate-950 border-t border-slate-900 shrink-0">
         <div className="flex items-center space-x-2">
           <textarea
             value={input}
